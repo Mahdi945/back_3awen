@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 
-const userSchema = new mongoose.Schema({
+const tempUserSchema = new mongoose.Schema({
   firstName: {
     type: String,
     required: true
@@ -29,8 +29,13 @@ const userSchema = new mongoose.Schema({
   isVerified: {
     type: Boolean,
     default: false // Add isVerified field
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now,
+    expires: 600 // Expire after 10 minutes (600 seconds)
   }
 });
 
-const User = mongoose.model('User', userSchema);
-module.exports = User;
+const TempUser = mongoose.model('TempUser', tempUserSchema);
+module.exports = TempUser;

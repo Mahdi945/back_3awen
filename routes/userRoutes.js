@@ -1,55 +1,63 @@
 const express = require('express');
 const router = express.Router();
 const User = require('../models/userModel');
-const bcrypt = require('bcrypt'); 
+const TempUser = require('../models/tempUserModel'); // Import TempUser model
+const bcrypt = require('bcrypt');
 const nodemailer = require('nodemailer');
-const jwt = require('jsonwebtoken'); // Import JWT for token-based email verification
+const jwt = require('jsonwebtoken');
 
-// Create a transporter for nodemailer
+// Configure nodemailer
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
     user: 'mahdibeyy@gmail.com',
-    pass: 'arhmcywiuwkbklqq'
+    pass: 'arhmcywiuwkbklqq' // Assurez-vous d'utiliser un mot de passe d'application Gmail.
   }
 });
 
 // Secret key for JWT
-const jwtSecret = 'your_jwt_secret_key'; // Replace with your actual secret key
+const jwtSecret = 'ayJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiIxMjM0NTY3ODkwIiwidXNlcm5hbWUiOiJtYWhkaSIsInJvbGUiOiJ1dGlsaXNhdGV1ciIsImlhdCI6MTUxNjIzOTAyMn0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c';
 
 // Registration route
 router.post('/register', async (req, res) => {
   const { firstName, lastName, email, phone, password, city } = req.body;
 
   try {
-    // Check if the user already exists
+    // Check if the user already exists in the main collection
     const userExists = await User.findOne({ email });
     if (userExists) {
       return res.status(400).json({ message: 'Email déjà utilisé' });
     }
 
+    // Check if the user already exists in the temporary collection
+    const tempUserExists = await TempUser.findOne({ email });
+    if (tempUserExists) {
+      return res.status(400).json({ message: 'Email déjà utilisé pour la vérification' });
+    }
+
     // Hash the password before saving the user
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Create a new user (not verified yet)
-    const newUser = new User({
+    // Create a new temporary user
+    const newTempUser = new TempUser({
       firstName,
       lastName,
       email,
       phone,
       password: hashedPassword, // Save the hashed password
       city,
-      isVerified: false // User is not verified initially
+      isVerified: false // Set isVerified to false
     });
 
-    // Save the user in the database
-    await newUser.save();
+    // Save the temporary user in the database
+    await newTempUser.save();
 
     // Create a verification token
-    const token = jwt.sign({ userId: newUser._id }, jwtSecret, { expiresIn: '1h' });
+    const token = jwt.sign({ userId: newTempUser._id }, jwtSecret, { expiresIn: '10m' });
 
     // Send verification email
-    const verificationUrl = `http://localhost:3000/api/users/verify-email?token=${token}`;
+    const verificationUrl = `http://localhost:4200/email-verification?token=${token}`;
+
     const mailOptions = {
       from: 'mahdibeyy@gmail.com',
       to: email,
@@ -65,29 +73,43 @@ router.post('/register', async (req, res) => {
     res.status(500).json({ message: 'Erreur du serveur' });
   }
 });
-
 // Email verification route
 router.get('/verify-email', async (req, res) => {
-  const { token } = req.query;
+  const token = req.query.token;
 
   try {
     // Verify the token
     const decoded = jwt.verify(token, jwtSecret);
 
-    // Find the user and update their verification status
-    const user = await User.findById(decoded.userId);
+    // Find the temporary user by ID
+    const tempUser = await TempUser.findById(decoded.userId);
 
-    if (!user) {
-      return res.status(404).json({ message: 'Utilisateur non trouvé' });
+    if (!tempUser) {
+      return res.status(404).json({ message: 'Utilisateur non trouvé ou lien expiré' });
     }
 
-    if (user.isVerified) {
-      return res.status(400).json({ message: 'Utilisateur déjà vérifié' });
+    // Check if the user is already verified
+    if (tempUser.isVerified) {
+      return res.status(400).json({ message: 'Lien de vérification déjà utilisé.' });
     }
 
-    // Mark the user as verified
-    user.isVerified = true;
-    await user.save();
+    // Create a new user in the main collection
+    const newUser = new User({
+      firstName: tempUser.firstName,
+      lastName: tempUser.lastName,
+      email: tempUser.email,
+      phone: tempUser.phone,
+      password: tempUser.password, // Utiliser le mot de passe haché du TempUser
+      city: tempUser.city,
+      isVerified: true
+    });
+
+    // Save the new user in the main collection
+    await newUser.save();
+
+    // Mark the temporary user as verified
+    tempUser.isVerified = true;
+    await tempUser.save();
 
     res.status(200).json({ message: 'Email vérifié avec succès !' });
   } catch (error) {
@@ -96,7 +118,7 @@ router.get('/verify-email', async (req, res) => {
   }
 });
 
-// Login route (checking if user is verified)
+// Login route
 router.post('/login', async (req, res) => {
   const { email, password } = req.body;
 
@@ -105,27 +127,30 @@ router.post('/login', async (req, res) => {
     const user = await User.findOne({ email });
 
     if (!user) {
-      return res.status(404).json({ message: 'Utilisateur non trouvé' });
+      console.log('Utilisateur non trouvé');
+      return res.status(404).json({ message: 'Adresse ou mot de passe incorrect' });
     }
 
     // Check if the user is verified
     if (!user.isVerified) {
+      console.log('Utilisateur non vérifié');
       return res.status(400).json({ message: 'Veuillez vérifier votre email avant de vous connecter.' });
     }
 
     // Compare the password with the hashed password in the database
-    const isMatch = await bcrypt.compare(password, user.password);
+    const isMatch = await bcrypt.compare(password, user.password); // Comparer le mot de passe brut avec le haché
     if (!isMatch) {
-      return res.status(400).json({ message: 'Mot de passe incorrect' });
+      console.log('Mot de passe incorrect');
+      return res.status(400).json({ message: 'Adresse ou mot de passe incorrect' });
     }
 
     // If all is correct, return success response
+    console.log('Connexion réussie');
     res.status(200).json({ message: 'Connexion réussie', user });
   } catch (error) {
-    console.error(error);
+    console.error('Erreur lors de la connexion:', error);
     res.status(500).json({ message: 'Erreur lors de la connexion' });
   }
 });
 
 module.exports = router;
-
