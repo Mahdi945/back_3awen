@@ -1,8 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const User = require('../models/userModel');
-const TempUser = require('../models/tempUserModel'); // Import TempUser model
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 const nodemailer = require('nodemailer');
 const jwt = require('jsonwebtoken');
 
@@ -23,23 +22,17 @@ router.post('/register', async (req, res) => {
   const { firstName, lastName, email, phone, password, city } = req.body;
 
   try {
-    // Check if the user already exists in the main collection
+    // Check if the user already exists
     const userExists = await User.findOne({ email });
     if (userExists) {
       return res.status(400).json({ message: 'Email déjà utilisé' });
     }
 
-    // Check if the user already exists in the temporary collection
-    const tempUserExists = await TempUser.findOne({ email });
-    if (tempUserExists) {
-      return res.status(400).json({ message: 'Email déjà utilisé pour la vérification' });
-    }
-
     // Hash the password before saving the user
-    const hashedPassword = await bcrypt.hash(password, 10);
+    const hashedPassword = await bcrypt.hash(password, 10); // 10 is the default salt rounds
 
-    // Create a new temporary user
-    const newTempUser = new TempUser({
+    // Create a new user
+    const newUser = new User({
       firstName,
       lastName,
       email,
@@ -49,11 +42,11 @@ router.post('/register', async (req, res) => {
       isVerified: false // Set isVerified to false
     });
 
-    // Save the temporary user in the database
-    await newTempUser.save();
+    // Save the user in the database
+    await newUser.save();
 
     // Create a verification token
-    const token = jwt.sign({ userId: newTempUser._id }, jwtSecret, { expiresIn: '10m' });
+    const token = jwt.sign({ userId: newUser._id }, jwtSecret, { expiresIn: '10m' });
 
     // Send verification email
     const verificationUrl = `http://localhost:4200/email-verification?token=${token}`;
@@ -62,7 +55,19 @@ router.post('/register', async (req, res) => {
       from: 'mahdibeyy@gmail.com',
       to: email,
       subject: 'Vérifiez votre adresse email',
-      html: `<p>Merci de vous être inscrit ! Cliquez <a href="${verificationUrl}">ici</a> pour vérifier votre email.</p>`
+      html: `
+        <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+          <div style="max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 10px;">
+            <h2 style="text-align: center; color: #4CAF50;">Bienvenue chez 3awen !</h2>
+            <p>Merci de vous être inscrit !</p>
+            <p>Pour compléter votre inscription, veuillez vérifier votre adresse email en cliquant sur le lien ci-dessous :</p>
+            <div style="text-align: center; margin: 20px 0;">
+              <a href="${verificationUrl}" style="background-color: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Vérifiez votre email</a>
+            </div>
+            <p>Cordialement,<br>L'équipe 3awen</p>
+          </div>
+        </div>
+      `
     };
 
     await transporter.sendMail(mailOptions);
@@ -73,6 +78,7 @@ router.post('/register', async (req, res) => {
     res.status(500).json({ message: 'Erreur du serveur' });
   }
 });
+
 // Email verification route
 router.get('/verify-email', async (req, res) => {
   const token = req.query.token;
@@ -81,35 +87,21 @@ router.get('/verify-email', async (req, res) => {
     // Verify the token
     const decoded = jwt.verify(token, jwtSecret);
 
-    // Find the temporary user by ID
-    const tempUser = await TempUser.findById(decoded.userId);
+    // Find the user by ID
+    const user = await User.findById(decoded.userId);
 
-    if (!tempUser) {
+    if (!user) {
       return res.status(404).json({ message: 'Utilisateur non trouvé ou lien expiré' });
     }
 
     // Check if the user is already verified
-    if (tempUser.isVerified) {
+    if (user.isVerified) {
       return res.status(400).json({ message: 'Lien de vérification déjà utilisé.' });
     }
 
-    // Create a new user in the main collection
-    const newUser = new User({
-      firstName: tempUser.firstName,
-      lastName: tempUser.lastName,
-      email: tempUser.email,
-      phone: tempUser.phone,
-      password: tempUser.password, // Utiliser le mot de passe haché du TempUser
-      city: tempUser.city,
-      isVerified: true
-    });
-
-    // Save the new user in the main collection
-    await newUser.save();
-
-    // Mark the temporary user as verified
-    tempUser.isVerified = true;
-    await tempUser.save();
+    // Mark the user as verified
+    user.isVerified = true;
+    await user.save();
 
     res.status(200).json({ message: 'Email vérifié avec succès !' });
   } catch (error) {
@@ -120,7 +112,7 @@ router.get('/verify-email', async (req, res) => {
 
 // Login route
 router.post('/login', async (req, res) => {
-  const { email, password } = req.body;
+  const { email, pass } = req.body;
 
   try {
     // Find user by email
@@ -131,16 +123,18 @@ router.post('/login', async (req, res) => {
       return res.status(404).json({ message: 'Adresse ou mot de passe incorrect' });
     }
 
-    // Check if the user is verified
-    if (!user.isVerified) {
-      console.log('Utilisateur non vérifié');
-      return res.status(400).json({ message: 'Veuillez vérifier votre email avant de vous connecter.' });
-    }
+    console.log('Utilisateur trouvé:', user);
 
-    // Compare the password with the hashed password in the database
-    const isMatch = await bcrypt.compare(password, user.password); // Comparer le mot de passe brut avec le haché
+   // Check if the user is verified
+   if (!user.isVerified) {
+    console.log('Utilisateur non vérifié');
+    return res.status(403).json({ message: 'Veuillez vérifier votre email avant de vous connecter.' });
+  }
+
+    // Compare the provided password with the hashed password in the database
+    const isMatch = await bcrypt.compare(pass, user.password);
     if (!isMatch) {
-      console.log('Mot de passe incorrect');
+      console.log('Mot de passe incorrect. Mot de passe entré:', pass, 'Mot de passe hashé:', user.password);
       return res.status(400).json({ message: 'Adresse ou mot de passe incorrect' });
     }
 
