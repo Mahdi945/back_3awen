@@ -1,3 +1,5 @@
+// models/eventModel.js
+
 const mongoose = require('mongoose');
 
 const eventSchema = new mongoose.Schema({
@@ -35,7 +37,11 @@ const eventSchema = new mongoose.Schema({
   },
   preuves: [{
     type: String
-  }]
+  }],
+  isApproved: {  // New attribute
+    type: Boolean,
+    default: false // Initialize as false
+  }
 }, { timestamps: true });
 
 const Event = mongoose.model('Event', eventSchema);

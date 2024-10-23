@@ -1,44 +1,28 @@
+// server.js
 const express = require('express');
-const mongoose = require('mongoose');
 const bodyParser = require('body-parser');
 const cors = require('cors');
-const path = require('path'); // Pour la gestion des fichiers statiques (si nécessaire)
+const path = require('path');
+const connectDB = require('./config/db'); // Connexion à MongoDB
 
 // Importer les routes
 const userRoutes = require('./routes/userRoutes');
-const eventRoutes = require('./routes/eventRoutes'); // Nouvelle route pour les événements
-const adminRoutes = require('./routes/adminRoutes'); // Nouvelle route pour les administrateurs
+const eventRoutes = require('./routes/eventRoutes');
+const adminRoutes = require('./routes/adminRoutes');
+
 const app = express();
-const PORT = process.env.PORT || 3000; // Support des variables d'environnement pour le port
+const PORT = process.env.PORT || 3000;
 
 // Middleware
-app.use(cors()); // Autoriser toutes les requêtes CORS
-app.use(bodyParser.json()); // Parser les requêtes avec JSON
-app.use(bodyParser.urlencoded({ extended: true })); // Parser les requêtes encodées en URL
-
-// Pour servir des fichiers statiques (si nécessaire, par exemple pour des images téléchargées)
+app.use(cors());
+app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: true }));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// Utilisation des routes d'utilisateur avec le préfixe /api/users
+// Utilisation des routes
 app.use('/api/users', userRoutes);
-
-// Utilisation des routes pour la gestion des événements
 app.use('/api/events', eventRoutes);
-
 app.use('/api/admin', adminRoutes);
-
-
-// Connexion à MongoDB
-mongoose.connect('mongodb://localhost:27017/usersDB', {
-  useNewUrlParser: true,
-  useUnifiedTopology: true
-})
-  .then(() => {
-    console.log('MongoDB connecté avec succès');
-  })
-  .catch((err) => {
-    console.error('Erreur de connexion à MongoDB :', err);
-  });
 
 // Gestion des erreurs pour les routes non trouvées
 app.use((req, res, next) => {
@@ -51,7 +35,9 @@ app.use((err, req, res, next) => {
   res.status(500).json({ message: 'Erreur interne du serveur' });
 });
 
-// Lancer le serveur
+// Connexion à MongoDB et démarrer le serveur
+connectDB();
+
 app.listen(PORT, () => {
   console.log(`Serveur en cours d'exécution sur http://localhost:${PORT}`);
 });
