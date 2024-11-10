@@ -1,7 +1,17 @@
 const fs = require('fs');
 const path = require('path');
 const archiver = require('archiver');
+const nodemailer = require('nodemailer');
 const Event = require('../models/eventModel');
+
+// Configuration de nodemailer
+const transporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    user: 'mahdibeyy@gmail.com',
+    pass: 'arhmcywiuwkbklqq' // Assurez-vous d'utiliser un mot de passe d'application Gmail.
+  }
+});
 
 // Fonction pour créer un événement
 const createEvent = async (req, res) => {
@@ -40,6 +50,26 @@ const approveEvent = async (req, res) => {
     event.isApproved = true;
     await event.save();
 
+    // Envoyer un email de notification d'approbation
+    const mailOptions = {
+      from: 'mahdibeyy@gmail.com',
+      to: event.emailOrganisateur,
+      subject: 'Votre événement a été approuvé',
+      html: `
+        <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+          <div style="max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 10px;">
+            <h2 style="text-align: center; color: #4CAF50;">Votre événement a été approuvé !</h2>
+            <p>Bonjour ${event.nomOrganisateur},</p>
+            <p>Nous sommes heureux de vous informer que votre événement intitulé <strong>${event.titre}</strong> a été approuvé.</p>
+            <p>Merci de votre confiance.</p>
+            <p>Cordialement,<br>L'équipe de gestion des événements</p>
+          </div>
+        </div>
+      `
+    };
+
+    await transporter.sendMail(mailOptions);
+
     res.status(200).json({ message: 'Événement approuvé avec succès.' });
   } catch (error) {
     console.error('Erreur lors de l\'approbation de l\'événement:', error);
@@ -47,27 +77,92 @@ const approveEvent = async (req, res) => {
   }
 };
 
-// Fonction pour supprimer un événement
+// Fonction pour supprimer un événement et envoyer un email de refus
 const deleteEvent = async (req, res) => {
   try {
-    const result = await Event.findByIdAndDelete(req.params.eventId);
-    if (!result) {
+    const event = await Event.findById(req.params.eventId);
+    if (!event) {
       return res.status(404).json({ message: 'Événement non trouvé.' });
     }
-    res.status(200).json({ message: 'Événement supprimé avec succès.' });
+
+    // Envoyer un email de notification de refus
+    const mailOptions = {
+      from: 'mahdibeyy@gmail.com',
+      to: event.emailOrganisateur,
+      subject: 'Votre événement a été refusé',
+      html: `
+        <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+          <div style="max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 10px;">
+            <h2 style="text-align: center; color: #FF0000;">Votre événement a été refusé</h2>
+            <p>Bonjour ${event.nomOrganisateur},</p>
+            <p>Nous sommes désolés de vous informer que votre événement intitulé <strong>${event.titre}</strong> a été refusé.</p>
+            <p>Vos preuves n'ont pas été jugées convaincantes.</p>
+            <p>Merci de votre compréhension.</p>
+            <p>Cordialement,<br>L'équipe de gestion des événements</p>
+          </div>
+        </div>
+      `
+    };
+
+    await transporter.sendMail(mailOptions);
+
+    await Event.findByIdAndDelete(req.params.eventId);
+
+    res.status(200).json({ message: 'Événement refusé et supprimé avec succès.' });
   } catch (error) {
-    console.error('Erreur lors de la suppression de l\'événement:', error);
+    console.error('Erreur lors du refus de l\'événement:', error);
     res.status(500).json({ message: 'Erreur interne du serveur.' });
   }
 };
 
-// Fonction pour obtenir tous les événements
+// Fonction pour obtenir tous les événements approuvés
 const getAllEvents = async (req, res) => {
   try {
-    const events = await Event.find();
+    // Récupérer uniquement les événements approuvés
+    const events = await Event.find({ isApproved: true });
     res.status(200).json(events);
   } catch (error) {
     console.error('Erreur lors du chargement des événements:', error);
+    res.status(500).json({ message: 'Erreur interne du serveur.' });
+  }
+};
+
+// Fonction pour rechercher des événements
+const searchEvents = async (req, res) => {
+  try {
+    const { query } = req.query;
+    const searchQuery = new RegExp(query, 'i'); // 'i' for case-insensitive
+
+    const events = await Event.find({
+      isApproved: true,
+      $or: [
+        { titre: searchQuery },
+        { nomOrganisateur: searchQuery },
+        { lieu: searchQuery }
+      ]
+    });
+
+    res.status(200).json(events);
+  } catch (error) {
+    console.error('Erreur lors de la recherche des événements:', error);
+    res.status(500).json({ message: 'Erreur interne du serveur.' });
+  }
+};
+
+// Fonction pour participer à un événement
+const participateEvent = async (req, res) => {
+  try {
+    const event = await Event.findById(req.params.eventId);
+    if (!event) {
+      return res.status(404).json({ message: 'Événement non trouvé.' });
+    }
+
+    event.volontaires -= 1;
+    await event.save();
+
+    res.status(200).json({ message: 'Participation enregistrée avec succès.' });
+  } catch (error) {
+    console.error('Erreur lors de la participation à l\'événement:', error);
     res.status(500).json({ message: 'Erreur interne du serveur.' });
   }
 };
@@ -131,5 +226,7 @@ module.exports = {
   approveEvent,
   deleteEvent,
   getAllEvents,
-  downloadProofs
+  downloadProofs,
+  participateEvent,
+  searchEvents
 };

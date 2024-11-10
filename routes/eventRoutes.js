@@ -7,7 +7,9 @@ const {
   approveEvent,
   deleteEvent,
   getAllEvents,
-  downloadProofs, // Import the new download function
+  downloadProofs,
+  participateEvent,
+  searchEvents 
 } = require('../controllers/eventController');
 const router = express.Router();
 
@@ -37,6 +39,11 @@ router.put('/:eventId/approve', approveEvent);
 router.delete('/:eventId', deleteEvent);
 
 // Route to download proofs as a ZIP file
-router.get('/:eventId/downloadProofs', downloadProofs); // Updated route for downloading proofs as a ZIP file
+router.get('/:eventId/downloadProofs', downloadProofs);
+
+// Route to participate in an event
+router.put('/:eventId/participate', participateEvent);
+
+router.get('/search', searchEvents);
 
 module.exports = router;
