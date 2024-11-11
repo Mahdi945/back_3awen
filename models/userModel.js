@@ -29,7 +29,21 @@ const userSchema = new mongoose.Schema({
   isVerified: {
     type: Boolean,
     default: false // Add isVerified field
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now // Add createdAt field
+  },
+  updatedAt: {
+    type: Date,
+    default: Date.now // Add updatedAt field
   }
+});
+
+// Middleware to update the updatedAt field on save
+userSchema.pre('save', function(next) {
+  this.updatedAt = Date.now();
+  next();
 });
 
 const User = mongoose.model('User', userSchema);

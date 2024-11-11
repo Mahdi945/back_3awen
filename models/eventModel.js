@@ -1,5 +1,3 @@
-// models/eventModel.js
-
 const mongoose = require('mongoose');
 
 const eventSchema = new mongoose.Schema({
@@ -38,12 +36,31 @@ const eventSchema = new mongoose.Schema({
   preuves: [{
     type: String
   }],
-  isApproved: {  // New attribute
+  isApproved: {
     type: Boolean,
-    default: false // Initialize as false
+    default: false
+  },
+  id_user_organisateur: {
+    type: String,
+  },
+  participants: [{
+    type: String // Stocker les emails des participants
+  }],
+  createdAt: {
+    type: Date,
+    default: Date.now
+  },
+  updatedAt: {
+    type: Date,
+    default: Date.now
   }
-}, { timestamps: true });
+});
+
+// Middleware to update the updatedAt field on save
+eventSchema.pre('save', function(next) {
+  this.updatedAt = Date.now();
+  next();
+});
 
 const Event = mongoose.model('Event', eventSchema);
-
 module.exports = Event;

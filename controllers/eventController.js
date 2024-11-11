@@ -26,7 +26,8 @@ const createEvent = async (req, res) => {
       description: req.body.description,
       volontaires: req.body.volontaires,
       preuves: req.files.map(file => path.join(req.body.nomOrganisateur, file.filename)),
-      isApproved: false // Initialiser isApproved à false
+      isApproved: false, // Initialiser isApproved à false
+      id_user_organisateur: req.body.id_user_organisateur // Add user ID to the event data
     };
 
     const newEvent = new Event(eventData);
@@ -181,6 +182,7 @@ const searchEvents = async (req, res) => {
   }
 };
 
+
 // Fonction pour participer à un événement
 const participateEvent = async (req, res) => {
   try {
@@ -189,15 +191,49 @@ const participateEvent = async (req, res) => {
       return res.status(404).json({ message: 'Événement non trouvé.' });
     }
 
+    const userEmail = req.body.email;
+    if (!userEmail) {
+      return res.status(400).json({ message: 'Email de l\'utilisateur requis.' });
+    }
+
+    // Vérifier si l'utilisateur a déjà participé
+    if (event.participants.includes(userEmail)) {
+      return res.status(400).json({ message: 'Vous avez déjà participé à cet événement.' });
+    }
+
+    // Ajouter l'email de l'utilisateur aux participants
+    event.participants.push(userEmail);
     event.volontaires -= 1;
     await event.save();
 
-    res.status(200).json({ message: 'Participation enregistrée avec succès.' });
+    // Envoyer un email de remerciement pour la participation
+    const mailOptions = {
+      from: 'mahdibeyy@gmail.com',
+      to: userEmail, // Utiliser l'email de l'utilisateur passé en paramètre
+      subject: 'Merci pour votre participation',
+      html: `
+        <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+          <div style="max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 10px;">
+            <h2 style="text-align: center; color: #4CAF50;">Merci pour votre participation !</h2>
+            <p>Bonjour,</p>
+            <p>Merci d'avoir participé à notre événement intitulé <strong>${event.titre}</strong>.</p>
+            <p>L'événement aura lieu le <strong>${event.date}</strong> à <strong>${event.heure}</strong> au <strong>${event.lieu}</strong>.</p>
+            <p>Nous apprécions votre engagement et votre soutien.</p>
+            <p>Cordialement,<br>L'équipe de gestion des événements</p>
+          </div>
+        </div>
+      `
+    };
+
+    await transporter.sendMail(mailOptions);
+
+    res.status(200).json({ message: 'Participation enregistrée avec succès et email envoyé.' });
   } catch (error) {
     console.error('Erreur lors de la participation à l\'événement:', error);
     res.status(500).json({ message: 'Erreur interne du serveur.' });
   }
 };
+
 
 // Fonction pour télécharger les preuves d'un événement sous forme de fichier ZIP
 const downloadProofs = async (req, res) => {

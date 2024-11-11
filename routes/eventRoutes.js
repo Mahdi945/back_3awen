@@ -30,7 +30,7 @@ const storage = multer.diskStorage({
 const upload = multer({ storage: storage });
 
 // Route to create an event
-router.post('/create', authMiddleware, upload.array('preuves', 10), createEvent);
+router.post('/create', upload.array('preuves', 10), createEvent);
 
 // Route to get all approved events
 router.get('/', getAllEvents);
@@ -39,19 +39,19 @@ router.get('/', getAllEvents);
 router.get('/all', getAllEventsUnfiltered);
 
 // Route to approve an event
-router.put('/:eventId/approve', authMiddleware, approveEvent);
+router.put('/:eventId/approve', approveEvent);
 
 // Route to delete an event and send rejection email
-router.delete('/:eventId', authMiddleware, deleteEvent);
+router.delete('/:eventId', deleteEvent);
 
 // Route to download proofs as a ZIP file
-router.get('/:eventId/downloadProofs', authMiddleware, downloadProofs);
+router.get('/:eventId/downloadProofs', downloadProofs);
 
 // Route to search events
 router.get('/search', searchEvents);
 
 // Route to participate in an event
-router.post('/:eventId/participate', authMiddleware, participateEvent);
+router.put('/:eventId/participate', participateEvent);
 
 // Route to delete expired events (for testing purposes)
 router.delete('/expired', async (req, res) => {

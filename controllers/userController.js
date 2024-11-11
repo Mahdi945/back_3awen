@@ -162,6 +162,7 @@ exports.verifyEmail = async (req, res) => {
   }
 };
 
+
 exports.login = async (req, res) => {
   const { email, pass } = req.body;
 
@@ -180,7 +181,9 @@ exports.login = async (req, res) => {
       return res.status(400).json({ message: 'Adresse ou mot de passe incorrect' });
     }
 
-    res.status(200).json({ message: 'Connexion réussie', user });
+    const token = jwt.sign({ userId: user._id, email: user.email }, jwtSecret, { expiresIn: '1h' });
+
+    res.status(200).json({ message: 'Connexion réussie', token, user });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Erreur du serveur' });

@@ -1,12 +1,13 @@
 const jwt = require('jsonwebtoken');
-const User = require('./models/userModel');
+const User = require('./models/userModel'); // Assurez-vous que le chemin est correct
 
 const authMiddleware = async (req, res, next) => {
-  const token = req.header('Authorization').replace('Bearer ', '');
-  if (!token) {
+  const authHeader = req.header('Authorization');
+  if (!authHeader) {
     return res.status(401).json({ message: 'Accès refusé. Aucun token fourni.' });
   }
 
+  const token = authHeader.replace('Bearer ', '');
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const user = await User.findById(decoded.userId);
