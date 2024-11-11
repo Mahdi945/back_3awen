@@ -7,10 +7,13 @@ const {
   approveEvent,
   deleteEvent,
   getAllEvents,
+  getAllEventsUnfiltered,
   downloadProofs,
   participateEvent,
-  searchEvents 
+  searchEvents,
+  deleteExpiredEvents
 } = require('../controllers/eventController');
+const authMiddleware = require('../authMiddleware'); // Importer le middleware d'authentification
 const router = express.Router();
 
 // Configuration de multer pour l'upload de fichiers
@@ -27,23 +30,33 @@ const storage = multer.diskStorage({
 const upload = multer({ storage: storage });
 
 // Route to create an event
-router.post('/create', upload.array('preuves', 10), createEvent);
+router.post('/create', authMiddleware, upload.array('preuves', 10), createEvent);
 
-// Route to get all events
+// Route to get all approved events
 router.get('/', getAllEvents);
 
-// Route to approve an event
-router.put('/:eventId/approve', approveEvent);
+// Route to get all events without condition
+router.get('/all', getAllEventsUnfiltered);
 
-// Route to delete an event
-router.delete('/:eventId', deleteEvent);
+// Route to approve an event
+router.put('/:eventId/approve', authMiddleware, approveEvent);
+
+// Route to delete an event and send rejection email
+router.delete('/:eventId', authMiddleware, deleteEvent);
 
 // Route to download proofs as a ZIP file
-router.get('/:eventId/downloadProofs', downloadProofs);
+router.get('/:eventId/downloadProofs', authMiddleware, downloadProofs);
+
+// Route to search events
+router.get('/search', searchEvents);
 
 // Route to participate in an event
-router.put('/:eventId/participate', participateEvent);
+router.post('/:eventId/participate', authMiddleware, participateEvent);
 
-router.get('/search', searchEvents);
+// Route to delete expired events (for testing purposes)
+router.delete('/expired', async (req, res) => {
+  await deleteExpiredEvents();
+  res.status(200).json({ message: 'Événements dépassés supprimés avec succès.' });
+});
 
 module.exports = router;

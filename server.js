@@ -4,6 +4,9 @@ const bodyParser = require('body-parser');
 const cors = require('cors');
 const path = require('path');
 const connectDB = require('./config/db'); // Connexion à MongoDB
+const cron = require('node-cron');
+
+const { deleteExpiredEvents } = require('./controllers/eventController');
 
 // Importer les routes
 const userRoutes = require('./routes/userRoutes');
@@ -36,8 +39,18 @@ app.use((err, req, res, next) => {
 });
 
 // Connexion à MongoDB et démarrer le serveur
-connectDB();
+connectDB().then(async () => {
+  // Supprimer les événements expirés au démarrage du serveur
+  console.log('Suppression des événements expirés au démarrage du serveur');
+  await deleteExpiredEvents();
 
-app.listen(PORT, () => {
-  console.log(`Serveur en cours d'exécution sur http://localhost:${PORT}`);
+  // Planifier la suppression des événements expirés toutes les heures
+  cron.schedule('0 * * * *', async () => {
+    console.log('Exécution du cron job pour supprimer les événements dépassés');
+    await deleteExpiredEvents();
+  });
+
+  app.listen(PORT, () => {
+    console.log(`Serveur en cours d'exécution sur http://localhost:${PORT}`);
+  });
 });

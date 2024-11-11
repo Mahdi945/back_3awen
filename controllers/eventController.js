@@ -31,7 +31,28 @@ const createEvent = async (req, res) => {
 
     const newEvent = new Event(eventData);
     await newEvent.save();
-    
+
+    // Envoyer un email de confirmation de demande de création d'événement
+    const mailOptions = {
+      from: 'mahdibeyy@gmail.com',
+      to: eventData.emailOrganisateur,
+      subject: 'Confirmation de demande de création d\'événement',
+      html: `
+        <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+          <div style="max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 10px;">
+            <h2 style="text-align: center; color: #4CAF50;">Demande de création d'événement reçue</h2>
+            <p>Bonjour ${eventData.nomOrganisateur},</p>
+            <p>Nous avons bien reçu votre demande de création d'événement intitulé <strong>${eventData.titre}</strong>.</p>
+            <p>Nos administrateurs vont traiter votre demande et vous recevrez un email de confirmation d'approbation ou de refus dans les 48 heures.</p>
+            <p>Merci de votre confiance.</p>
+            <p>Cordialement,<br>L'équipe de gestion des événements</p>
+          </div>
+        </div>
+      `
+    };
+
+    await transporter.sendMail(mailOptions);
+
     res.status(201).json({ message: 'Événement créé avec succès', event: newEvent });
   } catch (error) {
     console.error('Erreur lors de la création de l\'événement:', error);
@@ -114,7 +135,17 @@ const deleteEvent = async (req, res) => {
     res.status(500).json({ message: 'Erreur interne du serveur.' });
   }
 };
-
+// Fonction pour obtenir tous les événements sans condition
+const getAllEventsUnfiltered = async (req, res) => {
+  try {
+    // Récupérer tous les événements sans condition
+    const events = await Event.find();
+    res.status(200).json(events);
+  } catch (error) {
+    console.error('Erreur lors du chargement des événements:', error);
+    res.status(500).json({ message: 'Erreur interne du serveur.' });
+  }
+};
 // Fonction pour obtenir tous les événements approuvés
 const getAllEvents = async (req, res) => {
   try {
@@ -126,6 +157,7 @@ const getAllEvents = async (req, res) => {
     res.status(500).json({ message: 'Erreur interne du serveur.' });
   }
 };
+
 
 // Fonction pour rechercher des événements
 const searchEvents = async (req, res) => {
@@ -220,13 +252,37 @@ const downloadProofs = async (req, res) => {
     res.status(500).json({ message: 'Erreur interne du serveur lors du téléchargement des preuves.' });
   }
 };
+// Fonction pour supprimer les événements dépassés
+const deleteExpiredEvents = async () => {
+  try {
+    const now = new Date();
+    const currentDate = now.toISOString().split('T')[0];
+    const currentTime = now.toTimeString().split(' ')[0];
+
+    const expiredEvents = await Event.find({
+      $or: [
+        { date: { $lt: currentDate } },
+        { date: currentDate, heure: { $lt: currentTime } }
+      ]
+    });
+
+    for (const event of expiredEvents) {
+      await Event.findByIdAndDelete(event._id);
+      console.log(`Événement avec l'ID ${event._id} supprimé car il est dépassé.`);
+    }
+  } catch (error) {
+    console.error('Erreur lors de la suppression des événements dépassés:', error);
+  }
+};
 
 module.exports = {
   createEvent,
   approveEvent,
   deleteEvent,
+  getAllEventsUnfiltered,
   getAllEvents,
   downloadProofs,
   participateEvent,
-  searchEvents
+  searchEvents,
+  deleteExpiredEvents
 };
