@@ -2,6 +2,7 @@ const User = require('../models/userModel');
 const bcrypt = require('bcryptjs');
 const nodemailer = require('nodemailer');
 const jwt = require('jsonwebtoken');
+const passport = require('passport');
 
 // Configuration de nodemailer
 const transporter = nodemailer.createTransport({
@@ -13,8 +14,30 @@ const transporter = nodemailer.createTransport({
 });
 
 // Clé secrète pour JWT
-const jwtSecret = 'ayJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiIxMjM0NTY3ODkwIiwidXNlcm5hbWUiOiJtYWhkaSIsInJvbGUiOiJ1dGlsaXNhdGV1ciIsImlhdCI6MTUxNjIzOTAyMn0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c';
+const jwtSecret = process.env.JWT_SECRET || 'ayJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiIxMjM0NTY3ODkwIiwidXNlcm5hbWUiOiJtYWhkaSIsInJvbGUiOiJ1dGlsaXNhdGV1ciIsImlhdCI6MTUxNjIzOTAyMn0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c';
 
+// Fonction pour gérer l'authentification avec Google
+exports.googleAuth = passport.authenticate('google', { scope: ['profile', 'email'] });
+
+// Fonction pour gérer le callback de Google
+exports.googleAuthCallback = (req, res) => {
+  passport.authenticate('google', { failureRedirect: '/login' }, (err, user) => {
+    if (err) {
+      return res.status(500).json({ message: 'Erreur lors de l\'authentification avec Google' });
+    }
+    if (!user) {
+      return res.status(401).json({ message: 'Utilisateur non trouvé' });
+    }
+
+    // Générer un token JWT
+    const token = jwt.sign({ userId: user._id, email: user.email }, jwtSecret, { expiresIn: '1h' });
+
+    // Rediriger vers le frontend avec le token
+    res.redirect(`http://localhost:4200?token=${token}`);
+  })(req, res);
+};
+
+// Fonction pour demander la réinitialisation du mot de passe
 exports.forgotPassword = async (req, res) => {
   const { email } = req.body;
 
@@ -55,6 +78,7 @@ exports.forgotPassword = async (req, res) => {
   }
 };
 
+// Fonction pour réinitialiser le mot de passe
 exports.resetPassword = async (req, res) => {
   const { token, newPassword } = req.body;
 
@@ -86,31 +110,50 @@ exports.resetPassword = async (req, res) => {
   }
 };
 
+// Fonction pour l'inscription
 exports.register = async (req, res) => {
-  const { firstName, lastName, email, phone, password, city } = req.body;
+  const { firstName, lastName, email, phone, password, city, isGoogleUser } = req.body;
 
   try {
+    // Vérifier si l'utilisateur existe déjà
     const userExists = await User.findOne({ email });
     if (userExists) {
-      return res.status(400).json({ message: 'Email déjà utilisé' });
+      return res.status(409).json({ message: 'Email déjà utilisé' });
     }
 
-    const hashedPassword = await bcrypt.hash(password, 10);
+    // Si l'utilisateur utilise Google pour s'inscrire, le marquer comme vérifié
+    const isVerified = isGoogleUser ? true : false;
+
+    // Hash le mot de passe si l'utilisateur ne s'est pas inscrit via Google
+    let hashedPassword;
+    if (!isGoogleUser) {
+      hashedPassword = await bcrypt.hash(password, 10);
+    }
+
+    // Créer un nouvel utilisateur
     const newUser = new User({
       firstName,
       lastName,
       email,
       phone,
-      password: hashedPassword,
+      password: isGoogleUser ? undefined : hashedPassword, // Pas de mot de passe si inscription via Google
       city,
-      isVerified: false
+      isVerified,
+      isGoogleUser
     });
 
     await newUser.save();
 
+    // Si l'utilisateur s'est inscrit via Google, rediriger vers la page de connexion
+    if (isGoogleUser) {
+      return res.status(201).json({ message: 'Utilisateur inscrit via Google. Connectez-vous pour commencer.' });
+    }
+
+    // Générer un token pour l'email de vérification
     const token = jwt.sign({ userId: newUser._id }, jwtSecret, { expiresIn: '10m' });
     const verificationUrl = `http://localhost:4200/email-verification?token=${token}`;
 
+    // Configuration de l'email de vérification
     const mailOptions = {
       from: 'mahdibeyy@gmail.com',
       to: email,
@@ -130,14 +173,19 @@ exports.register = async (req, res) => {
     `
     };
 
+    // Envoi de l'email de vérification
     await transporter.sendMail(mailOptions);
+
+    // Réponse après l'envoi de l'email
     res.status(201).json({ message: 'Utilisateur enregistré avec succès. Vérifiez votre email.' });
+
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Erreur du serveur' });
   }
 };
 
+// Fonction pour vérifier l'email
 exports.verifyEmail = async (req, res) => {
   const token = req.query.token;
 
@@ -162,7 +210,7 @@ exports.verifyEmail = async (req, res) => {
   }
 };
 
-
+// Fonction pour la connexion
 exports.login = async (req, res) => {
   const { email, pass } = req.body;
 
@@ -189,3 +237,77 @@ exports.login = async (req, res) => {
     res.status(500).json({ message: 'Erreur du serveur' });
   }
 };
+
+// Fonction pour mettre à jour les informations utilisateur
+exports.updateUser = async (req, res) => {
+  const { userId } = req.params;
+  const { firstName, lastName, phone, city } = req.body;
+
+  try {
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'Utilisateur non trouvé' });
+    }
+
+    // Mettre à jour les informations utilisateur
+    user.firstName = firstName || user.firstName;
+    user.lastName = lastName || user.lastName;
+    user.phone = phone || user.phone;
+    user.city = city || user.city;
+
+    await user.save();
+
+    res.status(200).json({ message: 'Informations utilisateur mises à jour avec succès', user });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Erreur du serveur' });
+  }
+};
+// Fonction pour envoyer un email de contact
+exports.sendContactEmail = async (req, res) => {
+  const { name, email, subject, message } = req.body;
+
+  const mailOptions = {
+    from: 'mahdibeyy@gmail.com',
+    to: 'mahdibeyy@gmail.com', // Remplacez par l'adresse email de support
+    subject: `Contact Form: ${subject}`,
+    html: `
+      <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+        <div style="max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 10px;">
+          <h2 style="text-align: center; color: #4CAF50;">Nouveau message de contact</h2>
+          <p><strong>Nom:</strong> ${name}</p>
+          <p><strong>Email:</strong> ${email}</p>
+          <p><strong>Sujet:</strong> ${subject}</p>
+          <p><strong>Message:</strong></p>
+          <p>${message}</p>
+          <p>Cordialement,<br>L'équipe 3awen</p>
+        </div>
+      </div>
+    `
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    res.status(200).json({ message: 'Email envoyé avec succès' });
+  } catch (error) {
+    console.error('Erreur lors de l\'envoi de l\'email de contact:', error);
+    res.status(500).json({ message: 'Erreur lors de l\'envoi de l\'email de contact' });
+  }
+};
+// Fonction pour supprimer un utilisateur
+exports.deleteUser = async (req, res) => {
+  const { userId } = req.params;
+
+  try {
+    const user = await User.findByIdAndDelete(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'Utilisateur non trouvé' });
+    }
+
+    res.status(200).json({ message: 'Utilisateur supprimé avec succès' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Erreur du serveur' });
+  }
+};
+

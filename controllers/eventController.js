@@ -13,10 +13,13 @@ const transporter = nodemailer.createTransport({
   }
 });
 
-// Fonction pour créer un événement
+
+
+// Function to create an event
 const createEvent = async (req, res) => {
   try {
     const eventData = {
+      eventType: req.body.eventType, // Add eventType to the event data
       nomOrganisateur: req.body.nomOrganisateur,
       emailOrganisateur: req.body.emailOrganisateur,
       titre: req.body.titre,
@@ -26,14 +29,24 @@ const createEvent = async (req, res) => {
       description: req.body.description,
       volontaires: req.body.volontaires,
       preuves: req.files.map(file => path.join(req.body.nomOrganisateur, file.filename)),
-      isApproved: false, // Initialiser isApproved à false
-      id_user_organisateur: req.body.id_user_organisateur // Add user ID to the event data
+      isApproved: false, // Initialize isApproved to false
+      id_user_organisateur: req.body.id_user_organisateur, // Add user ID to the event data
+      donateFor: req.body.donateFor, // Add donateFor to the event data
+      goal: req.body.goal, // Add goal for fundraising events
+      deadline: req.body.deadline // Add deadline for fundraising events
     };
+
+    // Remove donateFor, goal, and deadline if the event type is not fundraising
+    if (eventData.eventType !== 'fundraising') {
+      delete eventData.donateFor;
+      delete eventData.goal;
+      delete eventData.deadline;
+    }
 
     const newEvent = new Event(eventData);
     await newEvent.save();
 
-    // Envoyer un email de confirmation de demande de création d'événement
+    // Send a confirmation email for the event creation request
     const mailOptions = {
       from: 'mahdibeyy@gmail.com',
       to: eventData.emailOrganisateur,
@@ -60,6 +73,10 @@ const createEvent = async (req, res) => {
     res.status(500).json({ message: 'Erreur interne du serveur' });
   }
 };
+
+
+
+
 
 // Fonction pour approuver un événement
 const approveEvent = async (req, res) => {

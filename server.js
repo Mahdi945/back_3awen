@@ -1,10 +1,11 @@
-// server.js
 const express = require('express');
 const bodyParser = require('body-parser');
 const cors = require('cors');
 const path = require('path');
-const connectDB = require('./config/db'); // Connexion à MongoDB
+const connectDB = require('./config/db'); 
 const cron = require('node-cron');
+const passport = require('passport');
+require('./passportConfig'); // Assurez-vous que le fichier de configuration de Passport est correctement importé
 
 const { deleteExpiredEvents } = require('./controllers/eventController');
 
@@ -16,11 +17,21 @@ const adminRoutes = require('./routes/adminRoutes');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Middleware
+// Middleware pour gérer les en-têtes de sécurité (COOP, CORS)
 app.use(cors());
+
+app.use((req, res, next) => {
+  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
+  res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp');
+  next();
+});
+
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+// Initialiser Passport
+app.use(passport.initialize());
 
 // Utilisation des routes
 app.use('/api/users', userRoutes);
@@ -39,17 +50,7 @@ app.use((err, req, res, next) => {
 });
 
 // Connexion à MongoDB et démarrer le serveur
-connectDB().then(async () => {
-  // Supprimer les événements expirés au démarrage du serveur
-  console.log('Suppression des événements expirés au démarrage du serveur');
-  await deleteExpiredEvents();
-
-  // Planifier la suppression des événements expirés toutes les heures
-  cron.schedule('0 * * * *', async () => {
-    console.log('Exécution du cron job pour supprimer les événements dépassés');
-    await deleteExpiredEvents();
-  });
-
+connectDB().then(() => {
   app.listen(PORT, () => {
     console.log(`Serveur en cours d'exécution sur http://localhost:${PORT}`);
   });

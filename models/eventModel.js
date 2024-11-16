@@ -1,6 +1,10 @@
 const mongoose = require('mongoose');
 
 const eventSchema = new mongoose.Schema({
+  eventType: {
+    type: String,
+    required: true // Add eventType field
+  },
   nomOrganisateur: {
     type: String,
     required: true
@@ -15,15 +19,15 @@ const eventSchema = new mongoose.Schema({
   },
   date: {
     type: String,
-    required: true
+    required: function() { return this.eventType === 'service'; } // Required if eventType is service
   },
   heure: {
     type: String,
-    required: true
+    required: function() { return this.eventType === 'service'; } // Required if eventType is service
   },
   lieu: {
     type: String,
-    required: true
+    required: function() { return this.eventType === 'service'; } // Required if eventType is service
   },
   description: {
     type: String,
@@ -31,7 +35,7 @@ const eventSchema = new mongoose.Schema({
   },
   volontaires: {
     type: Number,
-    required: true
+    required: function() { return this.eventType === 'service'; } // Required if eventType is service
   },
   preuves: [{
     type: String
@@ -44,8 +48,20 @@ const eventSchema = new mongoose.Schema({
     type: String,
   },
   participants: [{
-    type: String // Stocker les emails des participants
+    type: String // Store participant emails
   }],
+  donateFor: {
+    type: String,
+    required: function() { return this.eventType === 'fundraising'; } // Required if eventType is fundraising
+  },
+  goal: {
+    type: Number,
+    required: function() { return this.eventType === 'fundraising'; } // Required if eventType is fundraising
+  },
+  deadline: {
+    type: String,
+    required: function() { return this.eventType === 'fundraising'; } // Required if eventType is fundraising
+  },
   createdAt: {
     type: Date,
     default: Date.now

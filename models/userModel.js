@@ -3,11 +3,11 @@ const mongoose = require('mongoose');
 const userSchema = new mongoose.Schema({
   firstName: {
     type: String,
-    required: true
+    required: function() { return !this.isGoogleUser; } // Requis si non Google
   },
   lastName: {
     type: String,
-    required: true
+    required: function() { return !this.isGoogleUser; } // Requis si non Google
   },
   email: {
     type: String,
@@ -15,36 +15,33 @@ const userSchema = new mongoose.Schema({
     unique: true
   },
   phone: {
-    type: String,
-    required: true
+    type: String
   },
   password: {
     type: String,
-    required: true
+    required: function() { return !this.isGoogleUser; } // Requis si non Google
   },
   city: {
-    type: String,
-    required: true
+    type: String
+  },
+  isGoogleUser: {
+    type: Boolean,
+    default: false // Indique si l'utilisateur vient de Google
   },
   isVerified: {
     type: Boolean,
-    default: false // Add isVerified field
+    default: false
   },
   createdAt: {
     type: Date,
-    default: Date.now // Add createdAt field
+    default: Date.now
   },
   updatedAt: {
     type: Date,
-    default: Date.now // Add updatedAt field
+    default: Date.now
   }
 });
 
-// Middleware to update the updatedAt field on save
-userSchema.pre('save', function(next) {
-  this.updatedAt = Date.now();
-  next();
-});
-
 const User = mongoose.model('User', userSchema);
+
 module.exports = User;
