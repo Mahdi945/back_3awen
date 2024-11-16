@@ -7,7 +7,7 @@ const jwtSecret = process.env.JWT_SECRET || 'ayJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ
 // Configurer Passport pour la stratégie Google
 passport.use(new GoogleStrategy({
     //clientID: '227936580507-vmrfhtno62vkofudvqsmit1916u1ng4n.apps.googleusercontent.com',
-    //clientSecret: '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',
+    
     callbackURL: 'http://localhost:3000/api/users/google/callback' // URL du callback
   },
   async (token, tokenSecret, profile, done) => {
