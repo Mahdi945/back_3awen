@@ -5,6 +5,9 @@ const eventSchema = new mongoose.Schema({
     type: String,
     required: true // Add eventType field
   },
+  eventImage: {
+    type: String // Add eventImage field
+  },
   nomOrganisateur: {
     type: String,
     required: true
@@ -48,7 +51,8 @@ const eventSchema = new mongoose.Schema({
     type: String,
   },
   participants: [{
-    type: String // Store participant emails
+    type: String,
+    required: function() { return this.eventType === 'service'; } // Required if eventType is service
   }],
   donateFor: {
     type: String,

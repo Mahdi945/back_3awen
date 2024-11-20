@@ -13,13 +13,14 @@ const transporter = nodemailer.createTransport({
   }
 });
 
-
-
 // Function to create an event
 const createEvent = async (req, res) => {
   try {
+    const preuvesFiles = req.files['preuves'] || [];
+    const eventImageFile = req.files['eventImage'] ? req.files['eventImage'][0] : null;
+
     const eventData = {
-      eventType: req.body.eventType, // Add eventType to the event data
+      eventType: req.body.eventType,
       nomOrganisateur: req.body.nomOrganisateur,
       emailOrganisateur: req.body.emailOrganisateur,
       titre: req.body.titre,
@@ -28,12 +29,13 @@ const createEvent = async (req, res) => {
       lieu: req.body.lieu,
       description: req.body.description,
       volontaires: req.body.volontaires,
-      preuves: req.files.map(file => path.join(req.body.nomOrganisateur, file.filename)),
-      isApproved: false, // Initialize isApproved to false
-      id_user_organisateur: req.body.id_user_organisateur, // Add user ID to the event data
-      donateFor: req.body.donateFor, // Add donateFor to the event data
-      goal: req.body.goal, // Add goal for fundraising events
-      deadline: req.body.deadline // Add deadline for fundraising events
+      preuves: preuvesFiles.map(file => path.join(req.body.nomOrganisateur, file.filename)),
+      eventImage: eventImageFile ? path.join('events', eventImageFile.filename) : null,
+      isApproved: false,
+      id_user_organisateur: req.body.id_user_organisateur,
+      donateFor: req.body.donateFor,
+      goal: req.body.goal,
+      deadline: req.body.deadline
     };
 
     // Remove donateFor, goal, and deadline if the event type is not fundraising
@@ -73,9 +75,6 @@ const createEvent = async (req, res) => {
     res.status(500).json({ message: 'Erreur interne du serveur' });
   }
 };
-
-
-
 
 
 // Fonction pour approuver un événement
@@ -153,30 +152,92 @@ const deleteEvent = async (req, res) => {
     res.status(500).json({ message: 'Erreur interne du serveur.' });
   }
 };
-// Fonction pour obtenir tous les événements sans condition
-const getAllEventsUnfiltered = async (req, res) => {
+
+
+// Fonction pour obtenir tous les événements de type "service"
+const getAllServiceEvents = async (req, res) => {
   try {
-    // Récupérer tous les événements sans condition
-    const events = await Event.find();
-    res.status(200).json(events);
+    // Récupérer tous les événements de type "service"
+    const events = await Event.find({ eventType: 'service' });
+
+    // Ajouter l'URL complète de l'image pour chaque événement
+    const eventsWithImageURL = events.map(event => {
+      if (event.eventImage) {
+        event.eventImage = `${req.protocol}://${req.get('host')}/uploads/${event.eventImage.replace(/\\/g, '/')}`;
+      }
+      return event;
+    });
+
+    res.status(200).json(eventsWithImageURL);
   } catch (error) {
-    console.error('Erreur lors du chargement des événements:', error);
+    console.error('Erreur lors du chargement des événements de service:', error);
     res.status(500).json({ message: 'Erreur interne du serveur.' });
   }
 };
-// Fonction pour obtenir tous les événements approuvés
-const getAllEvents = async (req, res) => {
+
+// Fonction pour obtenir tous les événements de type "fundraising"
+const getAllDonationEvents = async (req, res) => {
   try {
-    // Récupérer uniquement les événements approuvés
-    const events = await Event.find({ isApproved: true });
-    res.status(200).json(events);
+    // Récupérer tous les événements de type "fundraising"
+    const events = await Event.find({ eventType: 'fundraising' });
+
+    // Ajouter l'URL complète de l'image pour chaque événement
+    const eventsWithImageURL = events.map(event => {
+      if (event.eventImage) {
+        event.eventImage = `${req.protocol}://${req.get('host')}/uploads/${event.eventImage.replace(/\\/g, '/')}`;
+      }
+      return event;
+    });
+
+    res.status(200).json(eventsWithImageURL);
   } catch (error) {
-    console.error('Erreur lors du chargement des événements:', error);
+    console.error('Erreur lors du chargement des événements de collecte de fonds:', error);
     res.status(500).json({ message: 'Erreur interne du serveur.' });
   }
 };
 
 
+
+const getAllApprovedServiceEvents = async (req, res) => {
+  try {
+    const events = await Event.find({ isApproved: true, eventType: 'service' });
+
+    // Ajouter l'URL complète de l'image pour chaque événement
+    const eventsWithImageURL = events.map(event => {
+      if (event.eventImage) {
+        event.eventImage = `${req.protocol}://${req.get('host')}/uploads/${event.eventImage}`;
+      }
+      return event;
+    });
+
+    res.status(200).json(eventsWithImageURL);
+  } catch (error) {
+    console.error('Erreur lors du chargement des événements de service approuvés:', error);
+    res.status(500).json({ message: 'Erreur interne du serveur.' });
+  }
+};
+
+const getAllApprovedFundraisingEvents = async (req, res) => {
+  try {
+    const events = await Event.find({ isApproved: true, eventType: 'fundraising' });
+
+    // Ajouter l'URL complète de l'image pour chaque événement
+    const eventsWithImageURL = events.map(event => {
+      if (event.eventImage) {
+        event.eventImage = `${req.protocol}://${req.get('host')}/uploads/${event.eventImage}`;
+      }
+      return event;
+    });
+
+    res.status(200).json(eventsWithImageURL);
+  } catch (error) {
+    console.error('Erreur lors du chargement des événements de collecte de fonds approuvés:', error);
+    res.status(500).json({ message: 'Erreur interne du serveur.' });
+  }
+};
+
+
+// Fonction pour rechercher des événements
 // Fonction pour rechercher des événements
 const searchEvents = async (req, res) => {
   try {
@@ -192,12 +253,21 @@ const searchEvents = async (req, res) => {
       ]
     });
 
-    res.status(200).json(events);
+    // Ajouter l'URL complète de l'image pour chaque événement
+    const eventsWithImageURL = events.map(event => {
+      if (event.eventImage) {
+        event.eventImage = `${req.protocol}://${req.get('host')}/uploads/${event.eventImage.replace(/\\/g, '/')}`;
+      }
+      return event;
+    });
+
+    res.status(200).json(eventsWithImageURL);
   } catch (error) {
     console.error('Erreur lors de la recherche des événements:', error);
     res.status(500).json({ message: 'Erreur interne du serveur.' });
   }
 };
+
 
 
 // Fonction pour participer à un événement
@@ -305,6 +375,45 @@ const downloadProofs = async (req, res) => {
     res.status(500).json({ message: 'Erreur interne du serveur lors du téléchargement des preuves.' });
   }
 };
+
+// Fonction pour supprimer un événement approuvé et envoyer un email de notification
+const deleteApprovedEvent = async (req, res) => {
+  try {
+    const event = await Event.findOne({ _id: req.params.eventId, isApproved: true });
+    if (!event) {
+      return res.status(404).json({ message: 'Événement approuvé non trouvé.' });
+    }
+
+    await Event.findByIdAndDelete(req.params.eventId);
+
+    // Envoyer un email de notification de suppression
+    const mailOptions = {
+      from: 'mahdibeyy@gmail.com',
+      to: event.emailOrganisateur,
+      subject: 'Votre événement a été supprimé',
+      html: `
+        <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+          <div style="max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 10px; background-color: #FFA500;">
+            <h2 style="text-align: center; color: #FF4500;">Votre événement a été supprimé</h2>
+            <p>Bonjour ${event.nomOrganisateur},</p>
+            <p>Nous vous informons que votre événement intitulé <strong>${event.titre}</strong> a été supprimé.</p>
+            <p>Pour plus de détails, veuillez nous contacter à l'adresse suivante : <a href="mailto:beyymahdi@gmail.com">beyymahdi@gmail.com</a>.</p>
+            <p>Cordialement,<br>L'équipe de gestion des événements</p>
+          </div>
+        </div>
+      `
+    };
+
+    await transporter.sendMail(mailOptions);
+    res.status(200).json({ message: 'Événement approuvé supprimé avec succès et email envoyé.' });
+  } catch (error) {
+    console.error('Erreur lors de la suppression de l\'événement approuvé :', error);
+    res.status(500).json({ message: 'Erreur interne du serveur.' });
+  }
+};
+
+
+
 // Fonction pour supprimer les événements dépassés
 const deleteExpiredEvents = async () => {
   try {
@@ -327,15 +436,95 @@ const deleteExpiredEvents = async () => {
     console.error('Erreur lors de la suppression des événements dépassés:', error);
   }
 };
+// Mettre à jour l'objectif de fundraising après un paiement réussi
+const updateEventGoal = async (eventId, donationAmount) => {
+  try {
+    const event = await Event.findById(eventId);
+    if (!event) {
+      throw new Error('Événement non trouvé');
+    }
+
+    event.goal = (event.goal || 0) - donationAmount;
+    if (event.goal < 0) event.goal = 0;
+
+    await event.save();
+    return event;
+  } catch (error) {
+    console.error("Erreur lors de la mise à jour de l'objectif :", error);
+    throw error;
+  }
+};
+// Fonction pour mettre à jour un événement de type "service"
+const updateServiceEvent = async (req, res) => {
+  try {
+    const { eventId } = req.params;
+    const { titre, date, heure, lieu, description, volontaires } = req.body;
+
+    const event = await Event.findById(eventId);
+    if (!event || event.eventType !== 'service') {
+      return res.status(404).json({ message: 'Événement de type service non trouvé.' });
+    }
+
+    event.titre = titre || event.titre;
+    event.date = date || event.date;
+    event.heure = heure || event.heure;
+    event.lieu = lieu || event.lieu;
+    event.description = description || event.description;
+    event.volontaires = volontaires || event.volontaires;
+
+    await event.save();
+    res.status(200).json({ message: 'Événement de type service mis à jour avec succès', event });
+  } catch (error) {
+    console.error('Erreur lors de la mise à jour de l\'événement de type service :', error);
+    res.status(500).json({ message: 'Erreur interne du serveur.' });
+  }
+};
+
+// Fonction pour mettre à jour un événement de type "fundraising"
+const updateFundraisingEvent = async (req, res) => {
+  try {
+    const { eventId } = req.params;
+    const { titre, date, heure, lieu, description, donateFor, goal, deadline } = req.body;
+
+    const event = await Event.findById(eventId);
+    if (!event || event.eventType !== 'fundraising') {
+      return res.status(404).json({ message: 'Événement de type fundraising non trouvé.' });
+    }
+
+    event.titre = titre || event.titre;
+    event.date = date || event.date;
+    event.heure = heure || event.heure;
+    event.lieu = lieu || event.lieu;
+    event.description = description || event.description;
+    event.donateFor = donateFor || event.donateFor;
+    event.goal = goal || event.goal;
+    event.deadline = deadline || event.deadline;
+
+    await event.save();
+    res.status(200).json({ message: 'Événement de type fundraising mis à jour avec succès', event });
+  } catch (error) {
+    console.error('Erreur lors de la mise à jour de l\'événement de type fundraising :', error);
+    res.status(500).json({ message: 'Erreur interne du serveur.' });
+  }
+};
+
+
 
 module.exports = {
   createEvent,
   approveEvent,
   deleteEvent,
-  getAllEventsUnfiltered,
-  getAllEvents,
+    getAllServiceEvents,
+  getAllDonationEvents,
   downloadProofs,
   participateEvent,
+  deleteApprovedEvent,
   searchEvents,
-  deleteExpiredEvents
+  deleteExpiredEvents,
+  getAllApprovedServiceEvents,
+  getAllApprovedFundraisingEvents,
+  updateEventGoal,
+  updateServiceEvent,
+  updateFundraisingEvent
+
 };

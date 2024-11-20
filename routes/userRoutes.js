@@ -6,6 +6,8 @@ const passport = require('passport');
 // Importer le fichier de configuration de passport
 require('../passportConfig');  // Assurez-vous que le chemin correspond à votre fichier passportConfig
 
+// Route pour récupérer tous les utilisateurs
+router.get('/all', userController.getAllUsers);
 // Route pour demander la réinitialisation du mot de passe
 router.post('/forgot-password', userController.forgotPassword);
 

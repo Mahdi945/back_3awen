@@ -36,7 +36,16 @@ exports.googleAuthCallback = (req, res) => {
     res.redirect(`http://localhost:4200?token=${token}`);
   })(req, res);
 };
-
+// Fonction pour récupérer tous les utilisateurs
+exports.getAllUsers = async (req, res) => {
+  try {
+    const users = await User.find();
+    res.status(200).json(users);
+  } catch (error) {
+    console.error('Erreur lors de la récupération des utilisateurs:', error);
+    res.status(500).json({ message: 'Erreur interne du serveur' });
+  }
+};
 // Fonction pour demander la réinitialisation du mot de passe
 exports.forgotPassword = async (req, res) => {
   const { email } = req.body;
