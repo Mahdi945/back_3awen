@@ -436,24 +436,46 @@ const deleteExpiredEvents = async () => {
     console.error('Erreur lors de la suppression des événements dépassés:', error);
   }
 };
-// Mettre à jour l'objectif de fundraising après un paiement réussi
-const updateEventGoal = async (eventId, donationAmount) => {
+
+
+const updateEventGoal = async (req, res) => {
   try {
-    const event = await Event.findById(eventId);
-    if (!event) {
-      throw new Error('Événement non trouvé');
+    const { eventId, donationAmount } = req.body;
+    
+    if (!eventId || !donationAmount) {
+      return res.status(400).json({ error: 'Données manquantes' });
     }
 
-    event.goal = (event.goal || 0) - donationAmount;
-    if (event.goal < 0) event.goal = 0;
+    // Trouver l'événement correspondant
+    const event = await Event.findById(eventId);
+    if (!event) {
+      return res.status(404).json({ error: 'Événement introuvable' });
+    }
 
-    await event.save();
-    return event;
+    if (event.goal !== undefined) {
+      // Mettre à jour l'objectif
+      event.goal -= donationAmount;
+
+      // Empêcher que l'objectif soit négatif
+      if (event.goal < 0) {
+        event.goal = 0;
+      }
+
+      await event.save();
+
+      return res.json({ remainingGoal: event.goal });
+    } else {
+      return res.status(400).json({ error: 'L\'événement n\'a pas de collecte de fonds.' });
+    }
   } catch (error) {
-    console.error("Erreur lors de la mise à jour de l'objectif :", error);
-    throw error;
+    console.error('Erreur lors de la mise à jour de l\'objectif :', error);
+    res.status(500).json({ error: 'Erreur serveur' });
   }
 };
+
+
+
+
 // Fonction pour mettre à jour un événement de type "service"
 const updateServiceEvent = async (req, res) => {
   try {

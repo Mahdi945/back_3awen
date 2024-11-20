@@ -66,6 +66,11 @@ const eventSchema = new mongoose.Schema({
     type: String,
     required: function() { return this.eventType === 'fundraising'; } // Required if eventType is fundraising
   },
+  raisedAmount: {
+    type: Number,
+    default: 0, // Initial amount is 0
+    required: function() { return this.eventType === 'fundraising'; } // Only for fundraising events
+  },
   createdAt: {
     type: Date,
     default: Date.now

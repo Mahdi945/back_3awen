@@ -2,12 +2,22 @@ const stripe = require('stripe')('sk_test_51QLZyZKtG1o9vy1V0th3vswNgJzOcGdhTrGfH
 
 const createCheckoutSession = async (req, res) => {
   try {
-    const { items } = req.body;
+    const { items, eventId, donationAmount } = req.body; // Inclut l'ID de l'événement et le montant du don
 
-    if (!items || !Array.isArray(items)) {
+    // Vérification des paramètres requis
+    if (!items || !Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ message: 'Invalid request: items are required and must be an array.' });
     }
 
+    if (!eventId) {
+      return res.status(400).json({ message: 'Invalid request: eventId is required.' });
+    }
+
+    if (!donationAmount || isNaN(donationAmount)) {
+      return res.status(400).json({ message: 'Invalid request: donationAmount is required and must be a number.' });
+    }
+
+    // Création de la session de paiement
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
       line_items: items.map(item => ({
@@ -21,8 +31,12 @@ const createCheckoutSession = async (req, res) => {
         quantity: item.quantity,
       })),
       mode: 'payment',
-      success_url: `http://localhost:4200/success?session_id={CHECKOUT_SESSION_ID}`, // URL de succès après paiement réussi
-      cancel_url: `http://localhost:4200/contact`, // URL si le paiement est annulé
+      success_url: `http://localhost:4200/donation-success?session_id={CHECKOUT_SESSION_ID}&event_id=${eventId}`,
+      cancel_url: `http://localhost:4200/contact`,
+      metadata: {
+        eventId, // ID de l'événement
+        donationAmount: donationAmount.toString(), // Montant du don en tant que métadonnée (converti en chaîne de caractères)
+      },
     });
 
     res.status(200).json({ sessionId: session.id });

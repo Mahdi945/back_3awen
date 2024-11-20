@@ -14,7 +14,6 @@ const userRoutes = require('./routes/userRoutes');
 const eventRoutes = require('./routes/eventRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const { updateEventGoal, deleteExpiredEvents } = require('./controllers/eventController'); // Import des fonctions
-
 const { createCheckoutSession } = require('./controllers/stripeController');
 
 const app = express();
@@ -25,6 +24,9 @@ app.use(cors());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+// Middleware pour Stripe Webhook (requiert express.raw)
+app.use('/webhooks/stripe', express.raw({ type: 'application/json' })); // Webhook Stripe nécessite express.raw
 
 // Initialiser Passport
 app.use(passport.initialize());
@@ -37,42 +39,50 @@ app.post('/api/checkoutSession', createCheckoutSession);
 
 // Webhook Stripe
 const endpointSecret = 'whsec_f6664e964c9971c0aac1aaf7cb0491921e7287133c4b2df81a4defcd3dc077e7'; // Clé secrète du webhook Stripe
-app.post('/webhooks/stripe', express.raw({ type: 'application/json' }), async (req, res) => {
+app.post('/webhooks/stripe', async (req, res) => {
   const sig = req.headers['stripe-signature'];
   let event;
 
   try {
+    // Vérification de la signature et traitement de l'événement
     event = stripe.webhooks.constructEvent(req.body, sig, endpointSecret);
   } catch (err) {
-    console.error('Erreur lors de la construction de l\'événement Stripe :', err);
+    console.error('Erreur lors de la construction de l\'événement Stripe :', err.message);
     return res.status(400).send(`Webhook Error: ${err.message}`);
   }
-
+  // Gestion des événements Stripe
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object;
+    const eventId = session.metadata?.eventId; // Récupération de l'ID de l'événement depuis les métadonnées
+    const donationAmount = parseFloat(session.metadata?.donationAmount); // Récupération du montant du don depuis les métadonnées
 
-    const eventId = session.metadata.eventId;
-    const donationAmount = session.amount_total / 100; // Convertir les cents en dollars
-
-    if (eventId) {
+    if (eventId && donationAmount) {
       try {
-        const updatedEvent = await updateEventGoal(eventId, donationAmount); // Appel au contrôleur
-        console.log('L\'objectif de l\'événement a été mis à jour :', updatedEvent.goal);
+        // Mise à jour de l'objectif dans la base de données
+         await updateEventGoal({ body: { eventId, donationAmount } });
+        console.log(`Mise à jour de l'objectif pour l'événement ${eventId} avec un don de ${donationAmount} $`);
       } catch (err) {
-        console.error('Erreur lors de la mise à jour de l\'objectif :', err);
+        console.error('Erreur lors de la mise à jour de l\'événement via webhook :', err.message);
+        res.status(500).json({ message: 'Erreur lors de la mise à jour de l\'événement' });
+        return;
       }
     } else {
-      console.warn('Aucun eventId trouvé dans les métadonnées Stripe');
+      console.warn('eventId ou donationAmount non trouvés dans les métadonnées Stripe.');
     }
   }
-
-  res.json({ received: true });
+  // Réponse de succès à Stripe
+  res.status(200).json({ received: true });
 });
 
 // Planifier la suppression des événements dépassés toutes les 24 heures
 cron.schedule('0 0 * * *', async () => {
   console.log('Suppression des événements dépassés...');
-  await deleteExpiredEvents();
+  try {
+    await deleteExpiredEvents();
+    console.log('Événements dépassés supprimés avec succès.');
+  } catch (err) {
+    console.error('Erreur lors de la suppression des événements dépassés :', err.message);
+  }
 });
 
 // Gestion des erreurs et démarrage du serveur
@@ -81,10 +91,11 @@ app.use((req, res, next) => {
 });
 
 app.use((err, req, res, next) => {
-  console.error('Erreur serveur :', err);
+  console.error('Erreur serveur :', err.message);
   res.status(500).json({ message: 'Erreur interne du serveur' });
 });
 
+// Connexion à la base de données et démarrage du serveur
 connectDB().then(() => {
   app.listen(PORT, () => {
     console.log(`Serveur en cours d'exécution sur http://localhost:${PORT}`);
