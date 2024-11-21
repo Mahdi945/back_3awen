@@ -15,10 +15,11 @@ const {
   participateEvent,
   searchEvents,
   deleteExpiredEvents,
-  updateEventGoal,
+  
   updateServiceEvent,
   updateFundraisingEvent
 } = require('../controllers/eventController');
+const { updateEventDonation } = require('../controllers/stripeController');
 const authMiddleware = require('../authMiddleware'); // Importer le middleware d'authentification
 const router = express.Router();
 
@@ -79,7 +80,8 @@ router.get('/search', searchEvents);
 
 // Route to participate in an event
 router.put('/:eventId/participate', participateEvent);
-router.put('/:eventId/updateGoal', updateEventGoal);
+router.put('/updateRaisedAmount', updateEventDonation);
+
 
 // Route to delete expired events (for testing purposes)
 router.delete('/expired', async (req, res) => {

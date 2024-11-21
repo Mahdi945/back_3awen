@@ -5,16 +5,18 @@ const path = require('path');
 const passport = require('passport');
 const stripe = require('stripe')('sk_test_51QLZyZKtG1o9vy1V0th3vswNgJzOcGdhTrGfHbpTJHN6ZZVp8adYguzaFZyKSg8QAqykmw1FNC3NQVLdAxlxHhfo00G6unSeqw'); // Clé secrète Stripe
 const cron = require('node-cron');
+const mongoose = require('mongoose');
 
 const connectDB = require('./config/db');
 require('./passportConfig');
 
-// Importer les routes et contrôleurs
+// Importer les modèles et contrôleurs
 const userRoutes = require('./routes/userRoutes');
 const eventRoutes = require('./routes/eventRoutes');
 const adminRoutes = require('./routes/adminRoutes');
-const { updateEventGoal, deleteExpiredEvents } = require('./controllers/eventController'); // Import des fonctions
+const { deleteExpiredEvents } = require('./controllers/eventController'); // Import des fonctions
 const { createCheckoutSession } = require('./controllers/stripeController');
+const Event = require('./models/eventModel'); // Modèle Event
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -50,26 +52,29 @@ app.post('/webhooks/stripe', async (req, res) => {
     console.error('Erreur lors de la construction de l\'événement Stripe :', err.message);
     return res.status(400).send(`Webhook Error: ${err.message}`);
   }
+
   // Gestion des événements Stripe
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object;
     const eventId = session.metadata?.eventId; // Récupération de l'ID de l'événement depuis les métadonnées
     const donationAmount = parseFloat(session.metadata?.donationAmount); // Récupération du montant du don depuis les métadonnées
+console.log('Mise à jour de l\'événement avec ID:', eventId);
+  console.log('Montant à incrémenter:', donationAmount);
 
-    if (eventId && donationAmount) {
-      try {
-        // Mise à jour de l'objectif dans la base de données
-         await updateEventGoal({ body: { eventId, donationAmount } });
-        console.log(`Mise à jour de l'objectif pour l'événement ${eventId} avec un don de ${donationAmount} $`);
-      } catch (err) {
-        console.error('Erreur lors de la mise à jour de l\'événement via webhook :', err.message);
-        res.status(500).json({ message: 'Erreur lors de la mise à jour de l\'événement' });
-        return;
-      }
-    } else {
-      console.warn('eventId ou donationAmount non trouvés dans les métadonnées Stripe.');
-    }
+  // Mettez à jour l'événement
+  const updatedEvent = await Event.findByIdAndUpdate(
+    eventId,
+    { $inc: { raisedAmount: donationAmount } },
+    { new: true }
+  );
+
+  if (updatedEvent) {
+    console.log('Événement mis à jour:', updatedEvent);
+  } else {
+    console.error('Événement non trouvé pour ID:', eventId);
   }
+}
+
   // Réponse de succès à Stripe
   res.status(200).json({ received: true });
 });

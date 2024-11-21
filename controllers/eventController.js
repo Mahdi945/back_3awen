@@ -437,39 +437,30 @@ const deleteExpiredEvents = async () => {
   }
 };
 
+// Fonction pour mettre à jour le montant levé de l'événement
+const updateEventRaisedAmount = async (req, res) => {
+  const { eventId, donationAmount } = req.body;
 
-const updateEventGoal = async (req, res) => {
+  if (!eventId || !donationAmount) {
+    return res.status(400).json({ message: 'Event ID et montant de la donation sont requis.' });
+  }
+
   try {
-    const { eventId, donationAmount } = req.body;
-    
-    if (!eventId || !donationAmount) {
-      return res.status(400).json({ error: 'Données manquantes' });
-    }
+    // Mise à jour du montant levé dans l'événement
+    const updatedEvent = await Event.findByIdAndUpdate(
+      eventId,
+      { $inc: { raisedAmount: donationAmount } }, // Incrémenter le montant levé
+      { new: true }
+    );
 
-    // Trouver l'événement correspondant
-    const event = await Event.findById(eventId);
-    if (!event) {
-      return res.status(404).json({ error: 'Événement introuvable' });
-    }
-
-    if (event.goal !== undefined) {
-      // Mettre à jour l'objectif
-      event.goal -= donationAmount;
-
-      // Empêcher que l'objectif soit négatif
-      if (event.goal < 0) {
-        event.goal = 0;
-      }
-
-      await event.save();
-
-      return res.json({ remainingGoal: event.goal });
+    if (updatedEvent) {
+      res.status(200).json({ message: 'Montant levé mis à jour avec succès.', event: updatedEvent });
     } else {
-      return res.status(400).json({ error: 'L\'événement n\'a pas de collecte de fonds.' });
+      res.status(404).json({ message: 'Événement non trouvé.' });
     }
-  } catch (error) {
-    console.error('Erreur lors de la mise à jour de l\'objectif :', error);
-    res.status(500).json({ error: 'Erreur serveur' });
+  } catch (err) {
+    console.error('Erreur lors de la mise à jour de l\'événement :', err.message);
+    res.status(500).json({ message: 'Erreur serveur lors de la mise à jour.' });
   }
 };
 
@@ -545,7 +536,7 @@ module.exports = {
   deleteExpiredEvents,
   getAllApprovedServiceEvents,
   getAllApprovedFundraisingEvents,
-  updateEventGoal,
+  updateEventRaisedAmount,
   updateServiceEvent,
   updateFundraisingEvent
 
