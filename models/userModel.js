@@ -3,11 +3,11 @@ const mongoose = require('mongoose');
 const userSchema = new mongoose.Schema({
   firstName: {
     type: String,
-    required: function() { return !this.isGoogleUser; } // Requis si non Google
+    required: true // Requis
   },
   lastName: {
     type: String,
-    required: function() { return !this.isGoogleUser; } // Requis si non Google
+    required: true // Requis
   },
   email: {
     type: String,
@@ -19,14 +19,10 @@ const userSchema = new mongoose.Schema({
   },
   password: {
     type: String,
-    required: function() { return !this.isGoogleUser; } // Requis si non Google
+    required: true // Requis
   },
   city: {
     type: String
-  },
-  isGoogleUser: {
-    type: Boolean,
-    default: false // Indique si l'utilisateur vient de Google
   },
   isVerified: {
     type: Boolean,

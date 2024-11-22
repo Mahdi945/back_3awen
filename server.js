@@ -16,6 +16,7 @@ const eventRoutes = require('./routes/eventRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const { deleteExpiredEvents } = require('./controllers/eventController'); // Import des fonctions
 const { createCheckoutSession } = require('./controllers/stripeController');
+const newsletterRoutes = require('./routes/newsletterRoutes'); // Import des routes de newsletter
 const Event = require('./models/eventModel'); // Modèle Event
 
 const app = express();
@@ -37,6 +38,7 @@ app.use(passport.initialize());
 app.use('/api/users', userRoutes);
 app.use('/api/events', eventRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/newsletter', newsletterRoutes); // Utiliser les routes de newsletter
 app.post('/api/checkoutSession', createCheckoutSession);
 
 // Webhook Stripe
