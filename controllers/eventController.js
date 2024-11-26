@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const archiver = require('archiver');
 const nodemailer = require('nodemailer');
+const Newsletter = require('../models/newsletterModel'); // Importer le modèle de newsletter
 const Event = require('../models/eventModel');
 
 // Configuration de nodemailer
@@ -75,9 +76,7 @@ const createEvent = async (req, res) => {
     res.status(500).json({ message: 'Erreur interne du serveur' });
   }
 };
-
-
-// Fonction pour approuver un événement
+// Fonction pour approuver un événement et envoyer des emails de notification
 const approveEvent = async (req, res) => {
   try {
     const event = await Event.findById(req.params.eventId);
@@ -88,29 +87,51 @@ const approveEvent = async (req, res) => {
     event.isApproved = true;
     await event.save();
 
-    // Envoyer un email de notification d'approbation
-    const mailOptions = {
+    // Envoyer un email de notification à l'organisateur
+    const mailOptionsOrganizer = {
       from: 'mahdibeyy@gmail.com',
       to: event.emailOrganisateur,
-      subject: 'Votre événement a été approuvé',
+      subject: 'Your event has been approved',
       html: `
         <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-          <div style="max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 10px;">
-            <h2 style="text-align: center; color: #4CAF50;">Votre événement a été approuvé !</h2>
-            <p>Bonjour ${event.nomOrganisateur},</p>
-            <p>Nous sommes heureux de vous informer que votre événement intitulé <strong>${event.titre}</strong> a été approuvé.</p>
-            <p>Merci de votre confiance.</p>
-            <p>Cordialement,<br>L'équipe de gestion des événements</p>
+          <div style="max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 10px; background-color: #FFFFFF;">
+            <h2 style="text-align: center; color: #4CAF50;">Your event has been approved</h2>
+            <p>Hello ${event.nomOrganisateur},</p>
+            <p>We are pleased to inform you that your event titled <strong>${event.titre}</strong> has been approved.</p>
+            <p>Best regards,<br>The Event Management Team</p>
           </div>
         </div>
       `
     };
 
-    await transporter.sendMail(mailOptions);
+    await transporter.sendMail(mailOptionsOrganizer);
 
-    res.status(200).json({ message: 'Événement approuvé avec succès.' });
+    // Récupérer tous les abonnés à la newsletter
+    const subscribers = await Newsletter.find();
+
+    // Envoyer un email de notification à tous les abonnés
+    const mailOptionsSubscribers = {
+      from: 'mahdibeyy@gmail.com',
+      to: subscribers.map(subscriber => subscriber.email),
+      subject: 'New event is available',
+      html: `
+        <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+          <div style="max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 10px; background-color: #FFFFFF;">
+            <h2 style="text-align: center; color: #4CAF50;">New event is available</h2>
+            <p>Hello,</p>
+            <p>We are pleased to inform you that a new event titled <strong>${event.titre}</strong> has been approved.</p>
+            <p>Visit our site for more details.</p>
+            <p>Best regards,<br>The Event Management Team</p>
+          </div>
+        </div>
+      `
+    };
+
+    await transporter.sendMail(mailOptionsSubscribers);
+
+    res.status(200).json({ message: 'Événement approuvé avec succès et emails envoyés.' });
   } catch (error) {
-    console.error('Erreur lors de l\'approbation de l\'événement:', error);
+    console.error('Erreur lors de l\'approbation de l\'événement :', error);
     res.status(500).json({ message: 'Erreur interne du serveur.' });
   }
 };
@@ -127,16 +148,16 @@ const deleteEvent = async (req, res) => {
     const mailOptions = {
       from: 'mahdibeyy@gmail.com',
       to: event.emailOrganisateur,
-      subject: 'Votre événement a été refusé',
+      subject: 'Your event has been rejected',
       html: `
         <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-          <div style="max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 10px;">
-            <h2 style="text-align: center; color: #FF0000;">Votre événement a été refusé</h2>
-            <p>Bonjour ${event.nomOrganisateur},</p>
-            <p>Nous sommes désolés de vous informer que votre événement intitulé <strong>${event.titre}</strong> a été refusé.</p>
-            <p>Vos preuves n'ont pas été jugées convaincantes.</p>
-            <p>Merci de votre compréhension.</p>
-            <p>Cordialement,<br>L'équipe de gestion des événements</p>
+          <div style="max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 10px; background-color: #FFFFFF;">
+            <h2 style="text-align: center; color: #FF0000;">Your event has been rejected</h2>
+            <p>Hello ${event.nomOrganisateur},</p>
+            <p>We regret to inform you that your event titled <strong>${event.titre}</strong> has been rejected.</p>
+            <p>Your proofs were not deemed convincing.</p>
+            <p>Thank you for your understanding.</p>
+            <p>Best regards,<br>The Event Management Team</p>
           </div>
         </div>
       `
@@ -297,16 +318,16 @@ const participateEvent = async (req, res) => {
     const mailOptions = {
       from: 'mahdibeyy@gmail.com',
       to: userEmail, // Utiliser l'email de l'utilisateur passé en paramètre
-      subject: 'Merci pour votre participation',
+      subject: 'Thank you for your participation',
       html: `
         <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
           <div style="max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 10px;">
-            <h2 style="text-align: center; color: #4CAF50;">Merci pour votre participation !</h2>
-            <p>Bonjour,</p>
-            <p>Merci d'avoir participé à notre événement intitulé <strong>${event.titre}</strong>.</p>
-            <p>L'événement aura lieu le <strong>${event.date}</strong> à <strong>${event.heure}</strong> au <strong>${event.lieu}</strong>.</p>
-            <p>Nous apprécions votre engagement et votre soutien.</p>
-            <p>Cordialement,<br>L'équipe de gestion des événements</p>
+            <h2 style="text-align: center; color: #4CAF50;">Thank you for your participation!</h2>
+            <p>Hello,</p>
+            <p>Thank you for participating in our event titled <strong>${event.titre}</strong>.</p>
+            <p>The event will take place on <strong>${event.date}</strong> at <strong>${event.heure}</strong> at <strong>${event.lieu}</strong>.</p>
+            <p>We appreciate your commitment and support.</p>
+            <p>Best regards,<br>The Event Management Team</p>
           </div>
         </div>
       `
@@ -390,15 +411,15 @@ const deleteApprovedEvent = async (req, res) => {
     const mailOptions = {
       from: 'mahdibeyy@gmail.com',
       to: event.emailOrganisateur,
-      subject: 'Votre événement a été supprimé',
+      subject: 'Your event has been deleted',
       html: `
         <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-          <div style="max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 10px; background-color: #FFA500;">
-            <h2 style="text-align: center; color: #FF4500;">Votre événement a été supprimé</h2>
-            <p>Bonjour ${event.nomOrganisateur},</p>
-            <p>Nous vous informons que votre événement intitulé <strong>${event.titre}</strong> a été supprimé.</p>
-            <p>Pour plus de détails, veuillez nous contacter à l'adresse suivante : <a href="mailto:beyymahdi@gmail.com">beyymahdi@gmail.com</a>.</p>
-            <p>Cordialement,<br>L'équipe de gestion des événements</p>
+          <div style="max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 10px; background-color: #FFFFFF;">
+            <h2 style="text-align: center; color: #FF4500;">Your event has been deleted</h2>
+            <p>Hello ${event.nomOrganisateur},</p>
+            <p>We regret to inform you that your event titled <strong>${event.titre}</strong> has been deleted.</p>
+            <p>For more details, please contact us at: <a href="mailto:beyymahdi@gmail.com">beyymahdi@gmail.com</a>.</p>
+            <p>Best regards,<br>The Event Management Team</p>
           </div>
         </div>
       `
@@ -523,6 +544,83 @@ const updateFundraisingEvent = async (req, res) => {
 
 
 
+
+
+// Fonction pour obtenir le nombre d'événements par mois
+const getEventCountByMonth = async (req, res) => {
+  try {
+    const events = await Event.aggregate([
+      {
+        $addFields: {
+          date: { $toDate: "$date" }
+        }
+      },
+      {
+        $group: {
+          _id: { $month: "$date" },
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { _id: 1 } }
+    ]);
+
+    res.status(200).json(events);
+  } catch (error) {
+    console.error('Error retrieving event count by month:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+// Fonction pour obtenir le montant total levé par mois
+const getRaisedAmountByMonth = async (req, res) => {
+  try {
+    const raisedAmounts = await Event.aggregate([
+      {
+        $addFields: {
+          date: { $toDate: "$date" }
+        }
+      },
+      {
+        $group: {
+          _id: { $month: "$date" },
+          totalRaised: { $sum: "$raisedAmount" }
+        }
+      },
+      { $sort: { _id: 1 } }
+    ]);
+
+    res.status(200).json(raisedAmounts);
+  } catch (error) {
+    console.error('Error retrieving raised amount by month:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+// Fonction pour obtenir le nombre d'événements par type
+const getEventCountByType = async (req, res) => {
+  try {
+    const events = await Event.aggregate([
+      {
+        $group: {
+          _id: "$eventType",
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { count: -1 } }
+    ]);
+
+    res.status(200).json(events);
+  } catch (error) {
+    console.error('Error retrieving event count by type:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+
+
+
+
+
 module.exports = {
   createEvent,
   approveEvent,
@@ -538,6 +636,9 @@ module.exports = {
   getAllApprovedFundraisingEvents,
   updateEventRaisedAmount,
   updateServiceEvent,
-  updateFundraisingEvent
+  updateFundraisingEvent,
+  getEventCountByMonth,
+  getEventCountByType,
+  getRaisedAmountByMonth,
 
 };

@@ -23,10 +23,10 @@ exports.googleAuth = passport.authenticate('google', { scope: ['profile', 'email
 exports.googleAuthCallback = (req, res) => {
   passport.authenticate('google', { failureRedirect: '/login' }, (err, user) => {
     if (err) {
-      return res.status(500).json({ message: 'Erreur lors de l\'authentification avec Google' });
+      return res.status(500).json({ message: 'Error during Google authentication' });
     }
     if (!user) {
-      return res.status(401).json({ message: 'Utilisateur non trouvé' });
+      return res.status(401).json({ message: 'User not found' });
     }
 
     // Générer un token JWT
@@ -36,16 +36,37 @@ exports.googleAuthCallback = (req, res) => {
     res.redirect(`http://localhost:4200?token=${token}`);
   })(req, res);
 };
+
 // Fonction pour récupérer tous les utilisateurs
 exports.getAllUsers = async (req, res) => {
   try {
     const users = await User.find();
     res.status(200).json(users);
   } catch (error) {
-    console.error('Erreur lors de la récupération des utilisateurs:', error);
-    res.status(500).json({ message: 'Erreur interne du serveur' });
+    console.error('Error retrieving users:', error);
+    res.status(500).json({ message: 'Internal server error' });
   }
 };
+
+// Fonction pour rechercher des utilisateurs par prénom, nom, ville ou email
+exports.searchUsers = async (req, res) => {
+  const { firstName, lastName, city, email } = req.query;
+
+  try {
+    const query = {};
+    if (firstName) query.firstName = new RegExp(firstName, 'i');
+    if (lastName) query.lastName = new RegExp(lastName, 'i');
+    if (city) query.city = new RegExp(city, 'i');
+    if (email) query.email = new RegExp(email, 'i');
+
+    const users = await User.find(query);
+    res.status(200).json(users);
+  } catch (error) {
+    console.error('Error searching users:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
 // Fonction pour demander la réinitialisation du mot de passe
 exports.forgotPassword = async (req, res) => {
   const { email } = req.body;
@@ -53,7 +74,7 @@ exports.forgotPassword = async (req, res) => {
   try {
     const user = await User.findOne({ email });
     if (!user) {
-      return res.status(404).json({ message: 'Utilisateur non trouvé' });
+      return res.status(404).json({ message: 'User not found' });
     }
 
     const token = jwt.sign({ userId: user._id }, jwtSecret, { expiresIn: '15m' });
@@ -62,28 +83,28 @@ exports.forgotPassword = async (req, res) => {
     const mailOptions = {
       from: 'mahdibeyy@gmail.com',
       to: email,
-      subject: 'Réinitialisation de votre mot de passe',
+      subject: 'Password Reset Request',
       html: `
         <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
           <div style="max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 10px;">
-            <h2 style="text-align: center; color: #4CAF50;">Réinitialisation de mot de passe</h2>
-            <p>Vous avez demandé à réinitialiser votre mot de passe.</p>
-            <p>Cliquez sur le lien ci-dessous pour créer un nouveau mot de passe :</p>
+            <h2 style="text-align: center; color: #4CAF50;">Password Reset Request</h2>
+            <p>You have requested to reset your password.</p>
+            <p>Click the link below to create a new password:</p>
             <div style="text-align: center; margin: 20px 0;">
-              <a href="${resetUrl}" style="background-color: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Réinitialiser le mot de passe</a>
+              <a href="${resetUrl}" style="background-color: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Reset Password</a>
             </div>
-            <p>Si vous n'avez pas fait cette demande, vous pouvez ignorer cet email.</p>
-            <p>Cordialement,<br>L'équipe 3awen</p>
+            <p>If you did not make this request, you can ignore this email.</p>
+            <p>Best regards,<br>The 3awen Team</p>
           </div>
         </div>
       `
     };
 
     await transporter.sendMail(mailOptions);
-    res.status(200).json({ message: 'Email de réinitialisation envoyé avec succès' });
+    res.status(200).json({ message: 'Password reset email sent successfully' });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: 'Erreur du serveur' });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -95,26 +116,26 @@ exports.resetPassword = async (req, res) => {
     const decoded = jwt.verify(token, jwtSecret);
     const user = await User.findById(decoded.userId);
     if (!user) {
-      return res.status(404).json({ message: 'Utilisateur non trouvé' });
+      return res.status(404).json({ message: 'User not found' });
     }
 
     if (!newPassword) {
-      return res.status(400).json({ message: 'Le nouveau mot de passe est requis.' });
+      return res.status(400).json({ message: 'New password is required.' });
     }
 
     const hashedPassword = await bcrypt.hash(newPassword, 10);
     user.password = hashedPassword;
     await user.save();
 
-    return res.status(200).json({ message: 'Mot de passe réinitialisé avec succès' });
+    return res.status(200).json({ message: 'Password reset successfully' });
   } catch (error) {
     if (error.name === 'TokenExpiredError') {
-      return res.status(401).json({ message: 'Le lien de réinitialisation a expiré.' });
+      return res.status(401).json({ message: 'Reset link has expired.' });
     } else if (error.name === 'JsonWebTokenError') {
-      return res.status(400).json({ message: 'Lien de réinitialisation invalide.' });
+      return res.status(400).json({ message: 'Invalid reset link.' });
     } else {
       console.error(error);
-      return res.status(500).json({ message: 'Erreur du serveur.' });
+      return res.status(500).json({ message: 'Server error.' });
     }
   }
 };
@@ -127,7 +148,7 @@ exports.register = async (req, res) => {
     // Vérifier si l'utilisateur existe déjà
     const userExists = await User.findOne({ email });
     if (userExists) {
-      return res.status(409).json({ message: 'Email déjà utilisé' });
+      return res.status(409).json({ message: 'Email already in use' });
     }
 
     // Si l'utilisateur utilise Google pour s'inscrire, le marquer comme vérifié
@@ -155,7 +176,7 @@ exports.register = async (req, res) => {
 
     // Si l'utilisateur s'est inscrit via Google, rediriger vers la page de connexion
     if (isGoogleUser) {
-      return res.status(201).json({ message: 'Utilisateur inscrit via Google. Connectez-vous pour commencer.' });
+      return res.status(201).json({ message: 'User registered via Google. Please log in to continue.' });
     }
 
     // Générer un token pour l'email de vérification
@@ -166,17 +187,17 @@ exports.register = async (req, res) => {
     const mailOptions = {
       from: 'mahdibeyy@gmail.com',
       to: email,
-      subject: 'Vérifiez votre adresse email',
+      subject: 'Verify your email address',
       html: `
       <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
         <div style="max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 10px;">
-          <h2 style="text-align: center; color: #4CAF50;">Bienvenue chez 3awen !</h2>
-          <p>Merci de vous être inscrit !</p>
-          <p>Pour compléter votre inscription, veuillez vérifier votre adresse email en cliquant sur le lien ci-dessous :</p>
+          <h2 style="text-align: center; color: #4CAF50;">Welcome to 3awen!</h2>
+          <p>Thank you for registering!</p>
+          <p>To complete your registration, please verify your email address by clicking the link below:</p>
           <div style="text-align: center; margin: 20px 0;">
-            <a href="${verificationUrl}" style="background-color: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Vérifiez votre email</a>
+            <a href="${verificationUrl}" style="background-color: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Verify your email</a>
           </div>
-          <p>Cordialement,<br>L'équipe 3awen</p>
+          <p>Best regards,<br>The 3awen Team</p>
         </div>
       </div>
     `
@@ -186,11 +207,11 @@ exports.register = async (req, res) => {
     await transporter.sendMail(mailOptions);
 
     // Réponse après l'envoi de l'email
-    res.status(201).json({ message: 'Utilisateur enregistré avec succès. Vérifiez votre email.' });
+    res.status(201).json({ message: 'User registered successfully. Please verify your email.' });
 
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: 'Erreur du serveur' });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -203,19 +224,19 @@ exports.verifyEmail = async (req, res) => {
     const user = await User.findById(decoded.userId);
 
     if (!user) {
-      return res.status(404).json({ message: 'Utilisateur non trouvé ou lien expiré' });
+      return res.status(404).json({ message: 'User not found or link expired' });
     }
 
     if (user.isVerified) {
-      return res.status(400).json({ message: 'Email déjà vérifié.' });
+      return res.status(400).json({ message: 'Email already verified.' });
     }
 
     user.isVerified = true;
     await user.save();
-    res.status(200).json({ message: 'Email vérifié avec succès !' });
+    res.status(200).json({ message: 'Email verified successfully!' });
   } catch (error) {
     console.error(error);
-    res.status(400).json({ message: 'Lien de vérification invalide ou expiré.' });
+    res.status(400).json({ message: 'Invalid or expired verification link.' });
   }
 };
 
@@ -226,24 +247,24 @@ exports.login = async (req, res) => {
   try {
     const user = await User.findOne({ email });
     if (!user) {
-      return res.status(404).json({ message: 'Adresse ou mot de passe incorrect' });
+      return res.status(404).json({ message: 'Incorrect email or password' });
     }
 
     if (!user.isVerified) {
-      return res.status(403).json({ message: 'Veuillez vérifier votre email avant de vous connecter.' });
+      return res.status(403).json({ message: 'Please verify your email before logging in.' });
     }
 
     const isMatch = await bcrypt.compare(pass, user.password);
     if (!isMatch) {
-      return res.status(400).json({ message: 'Adresse ou mot de passe incorrect' });
+      return res.status(400).json({ message: 'Incorrect email or password' });
     }
 
     const token = jwt.sign({ userId: user._id, email: user.email }, jwtSecret, { expiresIn: '1h' });
 
-    res.status(200).json({ message: 'Connexion réussie', token, user });
+    res.status(200).json({ message: 'Login successful', token, user });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: 'Erreur du serveur' });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -255,7 +276,7 @@ exports.updateUser = async (req, res) => {
   try {
     const user = await User.findById(userId);
     if (!user) {
-      return res.status(404).json({ message: 'Utilisateur non trouvé' });
+      return res.status(404).json({ message: 'User not found' });
     }
 
     // Mettre à jour les informations utilisateur
@@ -266,12 +287,13 @@ exports.updateUser = async (req, res) => {
 
     await user.save();
 
-    res.status(200).json({ message: 'Informations utilisateur mises à jour avec succès', user });
+    res.status(200).json({ message: 'User information updated successfully', user });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: 'Erreur du serveur' });
+    res.status(500).json({ message: 'Server error' });
   }
 };
+
 // Fonction pour envoyer un email de contact
 exports.sendContactEmail = async (req, res) => {
   const { name, email, subject, message } = req.body;
@@ -283,13 +305,13 @@ exports.sendContactEmail = async (req, res) => {
     html: `
       <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
         <div style="max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 10px;">
-          <h2 style="text-align: center; color: #4CAF50;">Nouveau message de contact</h2>
-          <p><strong>Nom:</strong> ${name}</p>
+          <h2 style="text-align: center; color: #4CAF50;">New Contact Message</h2>
+          <p><strong>Name:</strong> ${name}</p>
           <p><strong>Email:</strong> ${email}</p>
-          <p><strong>Sujet:</strong> ${subject}</p>
+          <p><strong>Subject:</strong> ${subject}</p>
           <p><strong>Message:</strong></p>
           <p>${message}</p>
-          <p>Cordialement,<br>L'équipe 3awen</p>
+          <p>Best regards,<br>The 3awen Team</p>
         </div>
       </div>
     `
@@ -297,12 +319,13 @@ exports.sendContactEmail = async (req, res) => {
 
   try {
     await transporter.sendMail(mailOptions);
-    res.status(200).json({ message: 'Email envoyé avec succès' });
+    res.status(200).json({ message: 'Email sent successfully' });
   } catch (error) {
-    console.error('Erreur lors de l\'envoi de l\'email de contact:', error);
-    res.status(500).json({ message: 'Erreur lors de l\'envoi de l\'email de contact' });
+    console.error('Error sending contact email:', error);
+    res.status(500).json({ message: 'Error sending contact email' });
   }
 };
+
 // Fonction pour supprimer un utilisateur
 exports.deleteUser = async (req, res) => {
   const { userId } = req.params;
@@ -310,13 +333,73 @@ exports.deleteUser = async (req, res) => {
   try {
     const user = await User.findByIdAndDelete(userId);
     if (!user) {
-      return res.status(404).json({ message: 'Utilisateur non trouvé' });
+      return res.status(404).json({ message: 'User not found' });
     }
 
-    res.status(200).json({ message: 'Utilisateur supprimé avec succès' });
+    // Envoyer un email de notification de suppression
+    const mailOptions = {
+      from: 'mahdibeyy@gmail.com',
+      to: user.email,
+      subject: 'Your account has been deleted',
+      html: `
+        <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+          <div style="max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 10px; background-color: #FFFFFF;">
+            <h2 style="text-align: center; color: #FF4500;">Your account has been deleted</h2>
+            <p>Hello ${user.firstName},</p>
+            <p>We regret to inform you that your account on 3awen has been deleted due to inactivity.</p>
+            <p>If you have any questions or concerns, please send an email to: <a href="mailto:mahdibeyy@gmail.com">mahdibeyy@gmail.com</a>.</p>
+            <p>Best regards,<br>The 3awen Team</p>
+          </div>
+        </div>
+      `
+    };
+
+    await transporter.sendMail(mailOptions);
+
+    res.status(200).json({ message: 'User deleted successfully and email sent.' });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: 'Erreur du serveur' });
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// Fonction pour obtenir le nombre d'utilisateurs par mois
+exports.getUserCountByMonth = async (req, res) => {
+  try {
+    const users = await User.aggregate([
+      {
+        $group: {
+          _id: { $month: "$createdAt" },
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { _id: 1 } }
+    ]);
+
+    res.status(200).json(users);
+  } catch (error) {
+    console.error('Error retrieving user count by month:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+// Fonction pour obtenir le nombre d'utilisateurs par ville
+exports.getUserCountByCity = async (req, res) => {
+  try {
+    const users = await User.aggregate([
+      {
+        $group: {
+          _id: "$city",
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { count: -1 } }
+    ]);
+
+    res.status(200).json(users);
+  } catch (error) {
+    console.error('Error retrieving user count by city:', error);
+    res.status(500).json({ message: 'Internal server error' });
   }
 };
 

@@ -17,7 +17,10 @@ const {
   deleteExpiredEvents,
   
   updateServiceEvent,
-  updateFundraisingEvent
+  updateFundraisingEvent,
+  getEventCountByMonth,
+  getEventCountByType,
+  getRaisedAmountByMonth,
 } = require('../controllers/eventController');
 const { updateEventDonation } = require('../controllers/stripeController');
 const authMiddleware = require('../authMiddleware'); // Importer le middleware d'authentification
@@ -77,10 +80,18 @@ router.get('/:eventId/downloadProofs', downloadProofs);
 
 // Route to search events
 router.get('/search', searchEvents);
+// Route pour obtenir le nombre d'événements par mois
+router.get('/countbymonth', getEventCountByMonth);
+
+// Route pour obtenir le nombre d'événements par type
+router.get('/countbytype', getEventCountByType);
+router.get('/raisedamountbymonth', getRaisedAmountByMonth);
 
 // Route to participate in an event
 router.put('/:eventId/participate', participateEvent);
 router.put('/updateRaisedAmount', updateEventDonation);
+// Route pour obtenir le montant total levé par mois
+
 
 
 // Route to delete expired events (for testing purposes)

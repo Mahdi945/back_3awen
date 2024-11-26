@@ -29,6 +29,9 @@ router.get('/verify-email', userController.verifyEmail);
 // Route pour la connexion
 router.post('/login', userController.login);
 
+// Route pour rechercher des utilisateurs par prénom, nom, ville ou email
+router.get('/search', userController.searchUsers);
+
 // Route pour mettre à jour les informations utilisateur
 router.put('/update/:userId', userController.updateUser);
 
@@ -37,5 +40,12 @@ router.post('/contact', userController.sendContactEmail);
 
 // Route pour supprimer un utilisateur
 router.delete('/delete/:userId', userController.deleteUser);
+
+// Route pour obtenir le nombre d'utilisateurs par mois
+router.get('/countbymonth', userController.getUserCountByMonth);
+
+// Route pour obtenir le nombre d'utilisateurs par ville
+router.get('/countbycity', userController.getUserCountByCity);
+
 
 module.exports = router;
