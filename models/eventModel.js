@@ -3,10 +3,11 @@ const mongoose = require('mongoose');
 const eventSchema = new mongoose.Schema({
   eventType: {
     type: String,
-    required: true // Add eventType field
+    required: true,
+    enum: ['service', 'fundraising'] // Ensure eventType is either 'service' or 'fundraising'
   },
   eventImage: {
-    type: String // Add eventImage field
+    type: String
   },
   nomOrganisateur: {
     type: String,
