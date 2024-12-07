@@ -545,19 +545,18 @@ const updateFundraisingEvent = async (req, res) => {
 
 
 
-
 // Fonction pour obtenir le nombre d'événements par mois
 const getEventCountByMonth = async (req, res) => {
   try {
     const events = await Event.aggregate([
       {
         $addFields: {
-          date: { $toDate: "$date" }
+          createdAt: { $toDate: "$createdAt" }
         }
       },
       {
         $group: {
-          _id: { $month: "$date" },
+          _id: { $month: "$createdAt" },
           count: { $sum: 1 }
         }
       },
@@ -577,12 +576,12 @@ const getRaisedAmountByMonth = async (req, res) => {
     const raisedAmounts = await Event.aggregate([
       {
         $addFields: {
-          date: { $toDate: "$date" }
+          createdAt: { $toDate: "$createdAt" }
         }
       },
       {
         $group: {
-          _id: { $month: "$date" },
+          _id: { $month: "$createdAt" },
           totalRaised: { $sum: "$raisedAmount" }
         }
       },
@@ -595,6 +594,7 @@ const getRaisedAmountByMonth = async (req, res) => {
     res.status(500).json({ message: 'Internal server error' });
   }
 };
+
 
 // Fonction pour obtenir le nombre d'événements par type
 const getEventCountByType = async (req, res) => {
@@ -616,16 +616,11 @@ const getEventCountByType = async (req, res) => {
   }
 };
 
-
-
-
-
-
 module.exports = {
   createEvent,
   approveEvent,
   deleteEvent,
-    getAllServiceEvents,
+  getAllServiceEvents,
   getAllDonationEvents,
   downloadProofs,
   participateEvent,
