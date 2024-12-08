@@ -55,17 +55,17 @@ const createEvent = async (req, res) => {
       to: eventData.emailOrganisateur,
       subject: 'Confirmation de demande de création d\'événement',
       html: `
-        <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-          <div style="max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 10px;">
-            <h2 style="text-align: center; color: #4CAF50;">Demande de création d'événement reçue</h2>
-            <p>Bonjour ${eventData.nomOrganisateur},</p>
-            <p>Nous avons bien reçu votre demande de création d'événement intitulé <strong>${eventData.titre}</strong>.</p>
-            <p>Nos administrateurs vont traiter votre demande et vous recevrez un email de confirmation d'approbation ou de refus dans les 48 heures.</p>
-            <p>Merci de votre confiance.</p>
-            <p>Cordialement,<br>L'équipe de gestion des événements</p>
-          </div>
+      <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+        <div style="max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 10px;">
+          <h2 style="text-align: center; color: #4CAF50;">Event Creation Request Received</h2>
+          <p>Hello ${eventData.nomOrganisateur},</p>
+          <p>We have received your request to create an event titled <strong>${eventData.titre}</strong>.</p>
+          <p>Our administrators will process your request and you will receive an approval or rejection confirmation email within 48 hours.</p>
+          <p>Thank you for your trust.</p>
+          <p>Best regards,<br>The Event Management Team</p>
         </div>
-      `
+      </div>
+`
     };
 
     await transporter.sendMail(mailOptions);
